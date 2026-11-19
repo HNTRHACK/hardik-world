@@ -10,12 +10,9 @@ import { Physics } from './physics/Physics';
 import { Loader } from './ui/Loader';
 import { ControlsHint } from './ui/ControlsHint';
 import { Environment } from './world/Environment';
-import { Ground } from './world/Ground';
-import { CalibrationProps } from './world/CalibrationProps';
+import { World } from './world/World';
+import { updateOcclusion } from './world/geo/occlusion';
 import { Rickshaw } from './vehicle/Rickshaw';
-import type { Spawn } from './vehicle/RickshawPhysics';
-
-const SPAWN: Spawn = { x: 0, z: 8, yaw: 0 };
 
 /** Owns every system. One instance per page; `dispose()` frees all GPU resources. */
 export class Experience {
@@ -29,8 +26,7 @@ export class Experience {
   physics!: Physics;
   rickshaw!: Rickshaw;
   private environment!: Environment;
-  private ground!: Ground;
-  private props!: CalibrationProps;
+  world!: World;
   private hint!: ControlsHint;
   private readonly offTick: () => void;
 
@@ -56,7 +52,7 @@ export class Experience {
         weight: 2,
         run: async () => {
           this.physics = await physicsReady;
-          this.build();
+          await this.build();
         },
       },
     ]);
@@ -74,20 +70,21 @@ export class Experience {
     if (this.debug.active) (window as unknown as { __lane?: Experience }).__lane = this;
   }
 
-  private build(): void {
+  private async build(): Promise<void> {
     this.environment = new Environment(this.scene, this.debug);
-    this.ground = new Ground(this.scene, this.physics);
-    this.props = new CalibrationProps(this.scene, this.physics);
-    this.rickshaw = new Rickshaw(this.scene, this.physics, this.input, SPAWN);
+    this.world = await World.create(this.scene, this.physics, this.debug, this.environment.sunDirection);
+    this.rickshaw = new Rickshaw(this.scene, this.physics, this.input, this.world.spawn);
     this.rickshaw.update(0);
   }
 
-  private readonly update = ({ delta }: TickInfo): void => {
+  private readonly update = ({ delta, elapsed }: TickInfo): void => {
     this.physics.update(delta, (dt) => this.rickshaw.fixedUpdate(dt));
     this.rickshaw.update(delta);
+    this.world.update(elapsed, delta, this.rickshaw.position);
     this.camera.follow(this.rickshaw.position, this.rickshaw.velocity, delta);
-    this.environment.follow(this.camera.target);
     this.camera.update();
+    this.environment.follow(this.camera.target, this.camera.instance.position);
+    updateOcclusion(this.camera.instance.position, this.rickshaw.position);
     this.renderer.instance.render(this.scene, this.camera.instance);
   };
 
@@ -96,8 +93,7 @@ export class Experience {
     this.time.dispose();
     this.hint?.dispose();
     this.rickshaw?.dispose();
-    this.props?.dispose();
-    this.ground?.dispose();
+    this.world?.dispose();
     this.environment?.dispose();
     this.physics?.dispose();
     this.camera?.dispose();

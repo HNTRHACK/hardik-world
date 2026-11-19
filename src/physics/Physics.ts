@@ -3,10 +3,15 @@ import type * as RAPIER from '@dimforge/rapier3d-compat';
 
 export type Rapier = (typeof RAPIER)['default'];
 
+/** An Object3D, or one slot of an InstancedMesh. */
+export type LinkTarget = THREE.Object3D | { mesh: THREE.InstancedMesh; index: number; scale?: number };
+
 /** A rendered object that mirrors a rigid body, interpolated between fixed steps. */
 interface Link {
   body: RAPIER.RigidBody;
-  object: THREE.Object3D;
+  object: LinkTarget;
+  /** Already written while asleep: skip until it wakes. */
+  rested: boolean;
   prevPos: THREE.Vector3;
   prevQuat: THREE.Quaternion;
   currPos: THREE.Vector3;
@@ -40,18 +45,34 @@ export class Physics {
     this.world.timestep = Physics.STEP;
   }
 
-  /** Make `object` follow `body` every frame. */
-  link(body: RAPIER.RigidBody, object: THREE.Object3D): void {
+  private readonly dirty = new Set<THREE.InstancedMesh>();
+  private readonly m = new THREE.Matrix4();
+  private readonly s = new THREE.Vector3();
+
+  /** Make `object` (or an instance slot) follow `body` every frame. */
+  link(body: RAPIER.RigidBody, object: LinkTarget): void {
     const t = body.translation();
     const r = body.rotation();
     const pos = new THREE.Vector3(t.x, t.y, t.z);
     const quat = new THREE.Quaternion(r.x, r.y, r.z, r.w);
-    this.links.push({ body, object, prevPos: pos.clone(), prevQuat: quat.clone(), currPos: pos, currQuat: quat });
-    object.position.copy(pos);
-    object.quaternion.copy(quat);
+    const l: Link = { body, object, rested: false, prevPos: pos.clone(), prevQuat: quat.clone(), currPos: pos, currQuat: quat };
+    this.links.push(l);
+    this.write(l, pos, quat);
   }
 
-  unlink(object: THREE.Object3D): void {
+  private write(l: Link, pos: THREE.Vector3, quat: THREE.Quaternion): void {
+    const o = l.object;
+    if (o instanceof THREE.Object3D) {
+      o.position.copy(pos);
+      o.quaternion.copy(quat);
+    } else {
+      const k = o.scale ?? 1;
+      o.mesh.setMatrixAt(o.index, this.m.compose(pos, quat, this.s.set(k, k, k)));
+      this.dirty.add(o.mesh);
+    }
+  }
+
+  unlink(object: LinkTarget): void {
     const i = this.links.findIndex((l) => l.object === object);
     if (i >= 0) this.links.splice(i, 1);
   }
@@ -63,6 +84,7 @@ export class Physics {
     this.read(l);
     l.prevPos.copy(l.currPos);
     l.prevQuat.copy(l.currQuat);
+    l.rested = false;
   }
 
   /**
@@ -83,10 +105,23 @@ export class Physics {
     }
     this.alpha = this.accumulator / Physics.STEP;
     for (const l of this.links) {
-      l.object.position.lerpVectors(l.prevPos, l.currPos, this.alpha);
-      l.object.quaternion.slerpQuaternions(l.prevQuat, l.currQuat, this.alpha);
+      if (l.body.isSleeping()) {
+        if (l.rested) continue;
+        l.rested = true;
+        this.write(l, l.currPos, l.currQuat);
+        continue;
+      }
+      l.rested = false;
+      this.tmpPos.lerpVectors(l.prevPos, l.currPos, this.alpha);
+      this.tmpQuat.slerpQuaternions(l.prevQuat, l.currQuat, this.alpha);
+      this.write(l, this.tmpPos, this.tmpQuat);
     }
+    for (const mesh of this.dirty) mesh.instanceMatrix.needsUpdate = true;
+    this.dirty.clear();
   }
+
+  private readonly tmpPos = new THREE.Vector3();
+  private readonly tmpQuat = new THREE.Quaternion();
 
   private read(l: Link): void {
     const t = l.body.translation();
