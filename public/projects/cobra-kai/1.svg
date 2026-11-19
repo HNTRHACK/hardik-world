@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+<rect width="1280" height="800" fill="#efe8dc"/>
+<g fill="none" stroke="#1b1310" stroke-width="2"><rect x="840" y="80" width="340" height="500" fill="none" stroke="#8a7f72" stroke-dasharray="4 6"/><text x="852" y="108" font-family="ui-monospace, monospace" font-size="15" fill="#8a7f72" stroke="none">OUT-OF-SAMPLE · HYPOTHETICAL</text><polyline points="100,320 120,302 139,308 159,286 178,287 198,279 218,256 237,255 257,231 276,227 296,204 316,183 335,178 355,193 374,174 394,159 414,164 433,186 453,188 472,182 492,205 512,181 531,198 551,187 570,168 590,148 610,137 629,152 649,135 668,138 688,144 708,137 727,138 747,115 766,110 786,110 806,118 825,113 845,110 864,113 884,110 904,110 923,124 943,133 962,119 982,122 1002,122 1021,140 1041,150 1060,138 1080,161 1100,141 1119,136 1139,148 1158,130 1178,128 1198,110" stroke="#1b1310" stroke-width="3"/><line x1="100" y1="580" x2="1180" y2="580"/></g>
+<line x1="80" y1="640" x2="1200" y2="640" stroke="#1b1310" stroke-width="1"/>
+<text x="80" y="700" font-family="Georgia, 'Times New Roman', serif" font-size="56" fill="#1b1310">COBRA KAI</text>
+<text x="80" y="740" font-family="ui-monospace, 'JetBrains Mono', monospace" font-size="18" letter-spacing="2" fill="#8a7f72">EVERY METRIC TRACES BACK TO DATA</text>
+<text x="1200" y="740" text-anchor="end" font-family="ui-monospace, monospace" font-size="16" letter-spacing="2" fill="#8a7f72">PLACEHOLDER · SCREENSHOT TO COME</text>
+</svg>
