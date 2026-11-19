@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hardik's Lane: drive through Hardik Bhatia's projects</title>
+    <meta
+      name="description"
+      content="A small low-poly Mumbai street at golden hour. Drive an auto-rickshaw to stalls that hold Hardik Bhatia's projects: full-stack and AI work from hackathons."
+    />
+    <meta name="theme-color" content="#1b1310" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip-classic" href="https://hardik-build-log.vercel.app" data-skip>Skip to classic site</a>
+
+    <div class="loader" data-loader role="progressbar" aria-label="Loading Hardik's Lane" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <p class="loader__title">Hardik’s Lane</p>
+      <div class="loader__bar"><span data-loader-bar></span></div>
+      <p class="loader__status" data-loader-status>Warming up the engine…</p>
+    </div>
+
+    <main id="main">
+      <h1 class="visually-hidden">Hardik Bhatia: Full-Stack &amp; AI Developer</h1>
+      <div class="webgl" data-webgl aria-hidden="true"></div>
+      <p class="hint" data-hint hidden>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to drive</span>
+        <span><kbd>Space</kbd> handbrake</span>
+        <span><kbd>Shift</kbd> boost</span>
+        <span><kbd>R</kbd> reset</span>
+      </p>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
