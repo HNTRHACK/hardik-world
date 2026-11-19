@@ -16,6 +16,21 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
 }
 
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/instrument-serif-400-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/instrument-sans-var-latin.woff2') format('woff2');
+}
+
 :root {
   --ink: #1b1310;
   --paper: #f6ead7;
@@ -23,7 +38,12 @@
   --rickshaw: #c8d43a;
   --terracotta: #c4553a;
   --sea: #2f7f9e;
-  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --sheet: #f7f2e8;
+  --sheet-ink: #1b1310;
+  --sheet-mute: #6b6157;
+  --sheet-rule: #e3d9c8;
   --ease: cubic-bezier(0.76, 0, 0.24, 1);
 }
 *,
