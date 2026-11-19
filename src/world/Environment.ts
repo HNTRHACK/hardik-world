@@ -1,70 +1,63 @@
 import * as THREE from 'three';
 import type { Debug } from '../core/Debug';
 import { palette } from './palette';
+import { Sky } from './Sky';
 
 /**
  * Golden-hour lighting:
- *  - one low, warm directional "sun" with a tight shadow frustum (so shadows stay crisp)
+ *  - one low, warm directional "sun" from the south-west (over the sea), whose
+ *    shadow box follows the camera's focus so long shadows stay crisp
  *  - a warm hemisphere fill so shadows read terracotta, not black
- *  - a gradient sky + matching fog for depth
+ *  - a sky dome with a sun glow + matching fog for depth
  */
 export class Environment {
-  readonly sun = new THREE.DirectionalLight(palette.sun, 2.6);
-  readonly hemi = new THREE.HemisphereLight(palette.hemiSky, palette.hemiGround, 1.9);
-  private readonly sky: THREE.CanvasTexture;
-  /** Sun direction relative to its target. The shadow box follows the target (the rickshaw, later). */
-  private readonly sunOffset = new THREE.Vector3(-18, 14, 10);
+  readonly sun = new THREE.DirectionalLight(palette.sun, 3.0);
+  readonly hemi = new THREE.HemisphereLight(palette.hemiSky, palette.hemiGround, 1.6);
+  /** Unit vector toward the sun; shared by the sky and sea shaders. */
+  readonly sunDirection = new THREE.Vector3();
+  readonly sky: Sky;
+  /** Sun direction (scaled for the light position). Low elevation = long shadows. */
+  private readonly sunOffset = new THREE.Vector3(-30, 17, 26);
+  private readonly lightDistance = 55;
+  private readonly tmp = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
     debug: Debug,
   ) {
-    this.sky = this.makeSky();
-    scene.background = this.sky;
-    scene.fog = new THREE.Fog(palette.fog, 35, 110);
+    scene.background = new THREE.Color(palette.fog);
+    scene.fog = new THREE.Fog(palette.fog, 40, 125);
+    this.sunDirection.copy(this.sunOffset).normalize();
+    this.sky = new Sky(scene, this.sunDirection);
 
     const s = this.sun;
     s.castShadow = true;
     s.shadow.mapSize.set(2048, 2048);
-    s.shadow.bias = -0.0004;
-    s.shadow.normalBias = 0.03;
-    s.shadow.radius = 4; // soft PCF edges
+    s.shadow.bias = -0.0005;
+    s.shadow.normalBias = 0.04;
+    s.shadow.radius = 3;
     const cam = s.shadow.camera;
-    cam.left = -16;
-    cam.right = 16;
-    cam.top = 16;
-    cam.bottom = -16;
-    cam.near = 1;
-    cam.far = 60;
+    cam.left = -30;
+    cam.right = 30;
+    cam.top = 30;
+    cam.bottom = -30;
+    cam.near = 5;
+    cam.far = 110;
     cam.updateProjectionMatrix();
-    s.position.copy(this.sunOffset);
     scene.add(s, s.target, this.hemi);
 
     this.addDebug(debug);
   }
 
   /** Keep the shadow frustum centred on what matters (called every frame, no allocations). */
-  follow(target: THREE.Vector3): void {
-    this.sun.target.position.copy(target);
-    this.sun.position.copy(target).add(this.sunOffset);
-  }
-
-  private makeSky(): THREE.CanvasTexture {
-    const c = document.createElement('canvas');
-    c.width = 2;
-    c.height = 256;
-    const g = c.getContext('2d')!;
-    const grad = g.createLinearGradient(0, 0, 0, 256);
-    const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
-    grad.addColorStop(0, hex(palette.skyTop));
-    grad.addColorStop(0.55, hex(palette.skyHorizon));
-    grad.addColorStop(0.78, hex(palette.skyGlow));
-    grad.addColorStop(1, hex(palette.fog));
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 2, 256);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+  follow(target: THREE.Vector3, camera: THREE.Vector3): void {
+    this.sunDirection.copy(this.sunOffset).normalize();
+    // Snap to shadow texels so edges don't shimmer as the focus moves.
+    const texel = (this.sun.shadow.camera.right * 2) / this.sun.shadow.mapSize.x;
+    this.tmp.set(Math.round(target.x / texel) * texel, 0, Math.round(target.z / texel) * texel);
+    this.sun.target.position.copy(this.tmp);
+    this.sun.position.copy(this.tmp).addScaledVector(this.sunDirection, this.lightDistance);
+    this.sky.follow(camera);
   }
 
   private addDebug(debug: Debug): void {
@@ -78,7 +71,7 @@ export class Environment {
     f.add(this.sunOffset, 'z', -40, 40, 0.1).name('sun z');
     const fog = this.scene.fog as THREE.Fog;
     f.add(fog, 'near', 0, 100, 0.5).name('fog near');
-    f.add(fog, 'far', 10, 200, 0.5).name('fog far');
+    f.add(fog, 'far', 10, 250, 0.5).name('fog far');
     const helper = new THREE.CameraHelper(this.sun.shadow.camera);
     helper.visible = false;
     this.scene.add(helper);

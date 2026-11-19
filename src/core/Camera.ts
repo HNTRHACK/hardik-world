@@ -13,7 +13,7 @@ export class Camera {
   /** Point the camera looks at (damped). */
   readonly target = new THREE.Vector3(0, 0.8, 0);
   /** Offset from the target. */
-  readonly offset = new THREE.Vector3(9.4, 5.8, 12.8);
+  readonly offset = new THREE.Vector3(12, 19.5, 16);
   readonly tuning = { lookAhead: 0.45, follow: 4.5, zoomAtSpeed: 0.2 };
   /** Portrait screens pull the camera back so the lane keeps the same horizontal coverage. */
   private distanceScale = 1;
@@ -27,7 +27,7 @@ export class Camera {
     private readonly sizes: Sizes,
     private readonly debug: Debug,
   ) {
-    this.instance = new THREE.PerspectiveCamera(35, sizes.aspect, 0.1, 220);
+    this.instance = new THREE.PerspectiveCamera(35, sizes.aspect, 0.3, 400);
     this.fit();
     this.off = sizes.on('resize', () => this.fit());
   }
