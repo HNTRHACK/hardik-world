@@ -13,6 +13,8 @@ import { Environment } from './world/Environment';
 import { World } from './world/World';
 import { updateOcclusion } from './world/geo/occlusion';
 import { Rickshaw } from './vehicle/Rickshaw';
+import { Stalls } from './stalls/Stalls';
+import { ProjectPanel } from './ui/ProjectPanel';
 
 /** Owns every system. One instance per page; `dispose()` frees all GPU resources. */
 export class Experience {
@@ -27,6 +29,8 @@ export class Experience {
   rickshaw!: Rickshaw;
   private environment!: Environment;
   world!: World;
+  stalls!: Stalls;
+  readonly panel = new ProjectPanel();
   private hint!: ControlsHint;
   private readonly offTick: () => void;
 
@@ -62,6 +66,7 @@ export class Experience {
     else r.compile(this.scene, this.camera.instance);
     this.loader.set(1, 'Ready');
     await this.camera.enableDebugOrbit(this.renderer.instance.domElement);
+    this.camera.enableUserControl(this.renderer.instance.domElement);
     this.camera.jump(this.rickshaw.position);
     this.renderer.instance.render(this.scene, this.camera.instance);
     this.loader.done();
@@ -73,6 +78,7 @@ export class Experience {
   private async build(): Promise<void> {
     this.environment = new Environment(this.scene, this.debug);
     this.world = await World.create(this.scene, this.physics, this.debug, this.environment.sunDirection);
+    this.stalls = new Stalls(this.scene, this.physics, this.world.plots, this.panel);
     this.rickshaw = new Rickshaw(this.scene, this.physics, this.input, this.world.spawn);
     this.rickshaw.update(0);
   }
@@ -82,7 +88,12 @@ export class Experience {
     this.rickshaw.update(delta);
     this.world.update(elapsed, delta, this.rickshaw.position);
     this.camera.follow(this.rickshaw.position, this.rickshaw.velocity, delta);
-    this.camera.update();
+    // Keep the stall and rickshaw in view beside (desktop) or above (phone) an open panel.
+    const w = this.sizes.width;
+    if (this.panel.current) this.camera.setFrameShift(w > 640 ? (Math.min(480, w - 32) + 16) / 2 : 0, w > 640 ? 0 : this.sizes.height * 0.27);
+    else this.camera.setFrameShift(0, 0);
+    this.camera.update(delta);
+    this.stalls.update(elapsed, delta, this.rickshaw, this.camera.instance, this.sizes.width, this.sizes.height);
     this.environment.follow(this.camera.target, this.camera.instance.position);
     updateOcclusion(this.camera.instance.position, this.rickshaw.position);
     this.renderer.instance.render(this.scene, this.camera.instance);
@@ -93,6 +104,8 @@ export class Experience {
     this.time.dispose();
     this.hint?.dispose();
     this.rickshaw?.dispose();
+    this.stalls?.dispose();
+    this.panel.dispose();
     this.world?.dispose();
     this.environment?.dispose();
     this.physics?.dispose();

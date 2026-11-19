@@ -36,8 +36,9 @@ export class World {
     this.sea = new Sea(scene, physics, sun);
     const buildings = new Buildings(scene, physics, this.net, this.plots, atlas);
     const spots = new Spots(this.net, this.plots, buildings.lots);
-    // keep the spawn point clear
+    // keep the spawn point and every stall's trigger ring clear
     spots.claim(this.spawn.x, this.spawn.z, 4);
+    for (const p of this.plots) spots.claim(p.ring.x, p.ring.z, p.ring.r + 0.9);
     const street = new StreetLife(scene, physics, this.net, spots, buildings.lots);
     const props = new Props(scene, physics, this.net, spots, roads.potholes);
     this.critters = new Critters(scene, physics, this.net, spots);

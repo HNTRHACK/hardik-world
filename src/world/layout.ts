@@ -195,6 +195,8 @@ export interface Plot {
   d: number;
   /** Yaw so that local +Z faces the road. */
   yaw: number;
+  /** The trigger ring on the drivable surface in front of the plot. */
+  ring: { x: number; z: number; r: number };
 }
 
 interface PlotDef {
@@ -227,12 +229,26 @@ export function makePlots(net: RoadNet): Plot[] {
     const off = road.def.halfWidth + road.def.footpath + 0.6 + p.d / 2;
     const x = s.x + n.x * off;
     const z = s.z + n.z * off;
-    // Face the road: local +Z points back along -n.
-    return { id: p.id, label: p.label, milestone: p.milestone, x, z, w: p.w, d: p.d, yaw: Math.atan2(-n.x, -n.z) };
+    // Face the road: local +Z points back along -n. The ring sits on the road, just off the kerb.
+    const ringOff = road.def.halfWidth - (road.def.kind === 'lane' ? 1.6 : 2.2);
+    const ring = { x: s.x + n.x * ringOff, z: s.z + n.z * ringOff, r: road.def.kind === 'lane' ? 2.4 : 2.9 };
+    return { id: p.id, label: p.label, milestone: p.milestone, x, z, w: p.w, d: p.d, yaw: Math.atan2(-n.x, -n.z), ring };
   });
   // The stock kiosk lives on the sea-facing promenade.
   const kz = -16;
-  plots.push({ id: 'cobrakai', label: 'Stock kiosk · COBRA KAI', milestone: 4, x: seaX(kz) + 3.3, z: kz, w: 3.6, d: 3.6, yaw: Math.PI / 2 });
+  const loop = net.get('loop');
+  const ls = loop.samples.reduce((a, b) => (Math.abs(b.z - kz) < Math.abs(a.z - kz) && b.x < 0 ? b : a));
+  plots.push({
+    id: 'cobrakai',
+    label: 'Stock kiosk · COBRA KAI',
+    milestone: 4,
+    x: seaX(kz) + 3.3,
+    z: kz,
+    w: 3.6,
+    d: 3.6,
+    yaw: Math.PI / 2,
+    ring: { x: ls.x - 2.2, z: ls.z, r: 2.9 },
+  });
   return plots;
 }
 
