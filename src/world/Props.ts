@@ -34,7 +34,7 @@ export class Props {
     const drops: Drop[] = [];
 
     // Cones ring a few potholes (the municipality's one-and-only fix).
-    potholes.slice(0, 4).forEach((p) => {
+    potholes.filter((p) => spots.free(p.x, p.z, 1.4)).slice(0, 4).forEach((p) => {
       for (let i = 0; i < 4; i++) {
         const a = p.yaw + (i / 4) * Math.PI * 2 + Math.PI / 4;
         drops.push({ kind: 'cone', x: p.x + Math.cos(a) * 1.0, z: p.z + Math.sin(a) * 1.0, yaw: rng.range(0, 6) });

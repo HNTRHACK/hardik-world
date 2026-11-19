@@ -108,6 +108,8 @@ export class RickshawPhysics {
   contacts = 0;
   /** Bumped on every teleport so the renderer can snap instead of interpolating across the map. */
   resets = 0;
+  /** External speed cap (m/s), e.g. inside a stall's ring. Infinity = none. */
+  speedLimit = Infinity;
   private stuckTime = 0;
   private readonly spawn: Spawn;
   private readonly world: RAPIER.World;
@@ -176,7 +178,7 @@ export class RickshawPhysics {
     const abs = Math.abs(speed);
 
     // Steering: less lock the faster you go, smoothed so keyboard taps don't jerk.
-    const topSpeed = input.boost ? S.boostMaxSpeed : S.maxSpeed;
+    const topSpeed = Math.min(input.boost ? S.boostMaxSpeed : S.maxSpeed, this.speedLimit);
     const lock = S.steerLow + (S.steerHigh - S.steerLow) * Math.min(abs / S.maxSpeed, 1);
     this.steering = approach(this.steering, -input.steer * lock, S.steerRate, dt);
     vc.setWheelSteering(0, this.steering);
@@ -201,6 +203,8 @@ export class RickshawPhysics {
     } else {
       brake = S.rollingBrake;
     }
+    // Over an external limit (a stall's ring): ease off firmly, in either direction.
+    if (abs > this.speedLimit + 0.4) brake = Math.max(brake, S.brakeForce * 1.5);
     vc.setWheelEngineForce(2, engine / 2);
     vc.setWheelEngineForce(3, engine / 2);
     for (let i = 0; i < 4; i++) vc.setWheelBrake(i, brake);
