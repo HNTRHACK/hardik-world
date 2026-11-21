@@ -23,6 +23,13 @@ All screenshots are of Hardik's own projects, in `public/projects/`:
 - Federated Clinical Platform, ORION, COBRA KAI: designed placeholders (`*.svg`),
   to be replaced with real screenshots.
 
+## Personal files
+
+- `public/me/portrait.webp`: a monogram placeholder; replace it with a real portrait
+  (any aspect, it's cropped to fit the hoarding's frame).
+- `public/resume.pdf`: optional. When it exists at build time, the About panel shows a
+  "Download résumé" button (restart `npm run dev` after adding it).
+
 ## Libraries
 
 - [three.js](https://threejs.org) (MIT)

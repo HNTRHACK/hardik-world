@@ -13,9 +13,18 @@ export const ICONS: Record<string, string> = {
   umang: wrap('<rect x="3.5" y="4.5" width="17" height="12" rx="1"/><path d="M8 20l1.5-3.5M16 20l-1.5-3.5"/><path d="M7 8.5h4M7 11.5h6M15 8.5h2"/>'),
   // traffic light
   orion: wrap('<rect x="8" y="2.5" width="8" height="15" rx="2"/><circle cx="12" cy="6.5" r="1.4"/><circle cx="12" cy="10" r="1.4"/><circle cx="12" cy="13.5" r="1.4"/><path d="M12 17.5V22"/>'),
+  // person
+  about: wrap('<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 4-5.5 7-5.5s5.8 1.9 7 5.5"/>'),
+  // envelope
+  contact: wrap('<rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/><path d="m4 7 8 6 8-6"/>'),
+  // newspaper
+  wins: wrap('<path d="M5 4.5h11.5v15H6.5A1.5 1.5 0 0 1 5 18z"/><path d="M16.5 8.5H19v9.5a1.5 1.5 0 0 1-3 0"/><path d="M8 8h5.5M8 11h5.5M8 14h3.5"/>'),
   // line chart
   'cobra-kai': wrap('<path d="M3.5 20.5h17"/><path d="m4.5 16 4.5-5 3.5 3 6.5-8"/><path d="M15.5 6h3.5v3.5"/>'),
 };
 
 export const CLOSE_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>`;
 export const ARROW_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M9 7h8v8"/></svg>`;
+
+export const GRID_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/></svg>`;
+export const MAP_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 4.5 3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/></svg>`;

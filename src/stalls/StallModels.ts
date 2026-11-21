@@ -19,13 +19,15 @@ export interface StallModel {
   labelHeight: number;
   colliders: LocalBox[];
   update(elapsed: number, delta: number): void;
+  /** Optional: the rickshaw just drove into this stall's ring (world position). */
+  onEnter?(from: THREE.Vector3): void;
   dispose(): void;
 }
 
 const SIGN_FONT = '"Baloo 2", "Nirmala UI", system-ui, sans-serif';
 
 /** Shared helpers for building one stall. */
-class Kit {
+export class Kit {
   readonly root = new THREE.Group();
   readonly g = new GeoBuilder();
   readonly colliders: LocalBox[] = [];
@@ -94,7 +96,7 @@ class Kit {
   }
 }
 
-function signText(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, maxW: number, color: string, weight = 700): void {
+export function signText(g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, maxW: number, color: string, weight = 700): void {
   let s = size;
   do g.font = `${weight} ${s}px ${SIGN_FONT}`;
   while (g.measureText(text).width > maxW && --s > 10);

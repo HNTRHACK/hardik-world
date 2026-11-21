@@ -15,6 +15,9 @@ import { updateOcclusion } from './world/geo/occlusion';
 import { Rickshaw } from './vehicle/Rickshaw';
 import { Stalls } from './stalls/Stalls';
 import { ProjectPanel } from './ui/ProjectPanel';
+import { PlacesMenu } from './ui/PlacesMenu';
+import { Minimap } from './ui/Minimap';
+import { PLACES } from './stalls/places';
 
 /** Owns every system. One instance per page; `dispose()` frees all GPU resources. */
 export class Experience {
@@ -32,6 +35,8 @@ export class Experience {
   stalls!: Stalls;
   readonly panel = new ProjectPanel();
   private hint!: ControlsHint;
+  private menu!: PlacesMenu;
+  private minimap!: Minimap;
   private readonly offTick: () => void;
 
   constructor(
@@ -71,16 +76,43 @@ export class Experience {
     this.renderer.instance.render(this.scene, this.camera.instance);
     this.loader.done();
     this.hint = new ControlsHint(this.input);
+    this.menu = new PlacesMenu(PLACES);
+    this.menu.onSelect = (id) => void this.travelTo(id);
+    this.minimap = new Minimap(this.world.net, this.stalls.stalls);
+    this.minimap.onSelect = (id) => void this.travelTo(id);
     this.time.start();
     if (this.debug.active) (window as unknown as { __lane?: Experience }).__lane = this;
   }
 
   private async build(): Promise<void> {
+    // The hoarding, clippings and panels paint with these faces: load them before any canvas draws.
+    await Promise.all(
+      ['400 40px "Instrument Serif"', '600 20px "Instrument Sans"', '700 40px "Baloo 2"'].map((f) => document.fonts.load(f).catch(() => [])),
+    );
     this.environment = new Environment(this.scene, this.debug);
     this.world = await World.create(this.scene, this.physics, this.debug, this.environment.sunDirection);
     this.stalls = new Stalls(this.scene, this.physics, this.world.plots, this.panel);
     this.rickshaw = new Rickshaw(this.scene, this.physics, this.input, this.world.spawn);
     this.rickshaw.update(0);
+  }
+
+  /**
+   * Projects menu / minimap: put the rickshaw at a place's ring, glide the camera
+   * there, then open its panel (as if you'd driven in, so driving away closes it).
+   */
+  async travelTo(id: string): Promise<void> {
+    const st = this.stalls.get(id);
+    if (!st || this.camera.flying) return;
+    if (this.panel.current) this.panel.close('away');
+    this.stalls.suspended = true;
+    const r = st.plot.ring;
+    // face along the road, toward the stall's side
+    const yaw = st.plot.yaw + Math.PI / 2;
+    this.rickshaw.physics.reset({ x: r.x, z: r.z, yaw });
+    this.panel.announce(`Travelling to ${st.place.short}.`);
+    await this.camera.flyTo(new THREE.Vector3(r.x, 0.6, r.z), 1.5);
+    this.stalls.suspended = false;
+    this.stalls.open(id, 'ring');
   }
 
   private readonly update = ({ delta, elapsed }: TickInfo): void => {
@@ -96,6 +128,7 @@ export class Experience {
     this.stalls.update(elapsed, delta, this.rickshaw, this.camera.instance, this.sizes.width, this.sizes.height);
     this.environment.follow(this.camera.target, this.camera.instance.position);
     updateOcclusion(this.camera.instance.position, this.rickshaw.position);
+    this.minimap?.update(this.rickshaw.position.x, this.rickshaw.position.z, this.rickshaw.physics.yaw, this.panel.current?.id ?? null);
     this.renderer.instance.render(this.scene, this.camera.instance);
   };
 
@@ -103,6 +136,8 @@ export class Experience {
     this.offTick();
     this.time.dispose();
     this.hint?.dispose();
+    this.menu?.dispose();
+    this.minimap?.dispose();
     this.rickshaw?.dispose();
     this.stalls?.dispose();
     this.panel.dispose();

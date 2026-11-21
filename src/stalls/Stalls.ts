@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import type { Physics } from '../physics/Physics';
 import type { Plot } from '../world/layout';
 import type { Rickshaw } from '../vehicle/Rickshaw';
-import { PROJECTS, type Project } from '../content/projects';
 import type { ProjectPanel } from '../ui/ProjectPanel';
-import { STALL_BUILDERS, type StallModel } from './StallModels';
+import type { StallModel } from './StallModels';
+import { PLACES, type Place } from './places';
 import { ICONS } from './icons';
 
 /** Ring speed cap (m/s) and how long you must be inside before the panel opens. */
@@ -13,14 +13,15 @@ const DWELL = 0.25;
 const CLOSE_MARGIN = 2.5;
 const LABEL_FAR = 95;
 
-interface Stall {
-  project: Project;
+export interface Stall {
+  place: Place;
   plot: Plot;
   model: StallModel;
   ring: THREE.Mesh;
   ringMat: THREE.ShaderMaterial;
   glow: number;
   dwell: number;
+  inside: boolean;
   /** Closed by the player while inside: don't reopen until they leave. */
   dismissed: boolean;
   anchor: THREE.Vector3;
@@ -28,12 +29,15 @@ interface Stall {
 }
 
 /**
- * The six project stalls: models on their plots, colliders, a glowing ground
- * ring each, a floating label (a real button: click / Enter opens the panel),
- * and the ring logic that slows the rickshaw and opens the panel.
+ * Every place on the lane (six project stalls + About / Contact / Wins):
+ * models on their plots, colliders, a glowing ground ring each, a floating
+ * label (a real button), and the ring logic that slows the rickshaw and opens
+ * the panel.
  */
 export class Stalls {
   readonly stalls: Stall[] = [];
+  /** While true (e.g. mid-teleport), rings don't open panels or cap speed. */
+  suspended = false;
   private readonly ringGeo = new THREE.CircleGeometry(1, 64);
   private readonly labels: HTMLElement;
   private readonly v = new THREE.Vector3();
@@ -46,14 +50,14 @@ export class Stalls {
   ) {
     this.ringGeo.rotateX(-Math.PI / 2);
     this.labels = document.querySelector<HTMLElement>('[data-labels]')!;
-    for (const project of PROJECTS) {
-      const plot = plots.find((p) => p.id === project.plot);
-      const build = STALL_BUILDERS[project.id];
-      if (!plot || !build) continue;
-      const model = build();
+    for (const place of PLACES) {
+      const plot = plots.find((p) => p.id === place.plot);
+      if (!plot) continue;
+      const model = place.build();
       model.root.position.set(plot.x, 0, plot.z);
       model.root.rotation.y = plot.yaw;
       scene.add(model.root);
+      model.root.updateMatrixWorld(true);
       const c = Math.cos(plot.yaw);
       const s = Math.sin(plot.yaw);
       for (const b of model.colliders) {
@@ -70,22 +74,26 @@ export class Stalls {
       ring.renderOrder = 2;
       scene.add(ring);
       const anchor = new THREE.Vector3(plot.x, model.labelHeight + 0.6, plot.z);
-      const label = this.makeLabel(project);
-      this.stalls.push({ project, plot, model, ring, ringMat, glow: 0.3, dwell: 0, dismissed: false, anchor, label });
+      const label = this.makeLabel(place);
+      this.stalls.push({ place, plot, model, ring, ringMat, glow: 0.3, dwell: 0, inside: false, dismissed: false, anchor, label });
     }
-    panel.onClose = (p, by) => {
-      const st = this.stalls.find((x) => x.project.id === p.id);
-      if (st && by === 'user') st.dismissed = st.dwell > 0;
+    panel.onClose = (entry, by) => {
+      const st = this.get(entry.id);
+      if (st && by === 'user') st.dismissed = st.inside;
     };
   }
 
-  private makeLabel(p: Project): HTMLButtonElement {
+  get(id: string): Stall | undefined {
+    return this.stalls.find((s) => s.place.id === id);
+  }
+
+  private makeLabel(p: Place): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'stall-label';
-    b.setAttribute('aria-label', `${p.short}, ${p.stall}. Open project`);
-    b.innerHTML = `<span class="stall-label__icon">${ICONS[p.id] ?? ''}</span><span class="stall-label__text"><span class="stall-label__name">${p.short}</span><span class="stall-label__kind">${p.stall}</span></span>`;
-    b.addEventListener('click', () => this.panel.open(p, 'label'));
+    b.setAttribute('aria-label', `${p.short}, ${p.kind}. Open`);
+    b.innerHTML = `<span class="stall-label__icon">${ICONS[p.id] ?? ''}</span><span class="stall-label__text"><span class="stall-label__name">${p.short}</span><span class="stall-label__kind">${p.kind}</span></span>`;
+    b.addEventListener('click', () => this.panel.open(p.entry, 'label'));
     this.labels.append(b);
     return b;
   }
@@ -116,10 +124,12 @@ export class Stalls {
     });
   }
 
-  /** Open a stall's panel directly (labels now, the projects menu in milestone 5). */
-  open(id: string): void {
-    const st = this.stalls.find((s) => s.project.id === id);
-    if (st) this.panel.open(st.project, 'label');
+  /** Open a place's panel directly. */
+  open(id: string, by: 'ring' | 'label' = 'label'): void {
+    const st = this.get(id);
+    if (!st) return;
+    st.dismissed = false;
+    this.panel.open(st.place.entry, by);
   }
 
   update(elapsed: number, delta: number, rickshaw: Rickshaw, camera: THREE.PerspectiveCamera, width: number, height: number): void {
@@ -131,17 +141,24 @@ export class Stalls {
       const d = Math.hypot(pos.x - st.plot.ring.x, pos.z - st.plot.ring.z);
       const r = st.plot.ring.r;
       const inside = d < r;
-      if (inside) {
-        limit = RING_LIMIT;
-        st.dwell += delta;
-        if (st.dwell > DWELL && !st.dismissed && this.panel.current?.id !== st.project.id) this.panel.open(st.project, 'ring');
-      } else {
-        st.dwell = 0;
-        // Approach zone: the cap ramps down as you near the ring, so you arrive slow.
-        if (d < r + 9) limit = Math.min(limit, RING_LIMIT + (d - r) * 1.3);
-        if (d > r + CLOSE_MARGIN) {
-          st.dismissed = false;
-          if (this.panel.current?.id === st.project.id && this.panel.openedBy === 'ring') this.panel.close('away');
+      // Entering only counts once a teleport has landed, so the postcard drop is seen.
+      if (!this.suspended) {
+        if (inside && !st.inside) st.model.onEnter?.(pos);
+        st.inside = inside;
+      }
+      if (!this.suspended) {
+        if (inside) {
+          limit = RING_LIMIT;
+          st.dwell += delta;
+          if (st.dwell > DWELL && !st.dismissed && this.panel.current?.id !== st.place.id) this.panel.open(st.place.entry, 'ring');
+        } else {
+          st.dwell = 0;
+          // Approach zone: the cap ramps down as you near the ring, so you arrive slow.
+          if (d < r + 9) limit = Math.min(limit, RING_LIMIT + (d - r) * 1.3);
+          if (d > r + CLOSE_MARGIN) {
+            st.dismissed = false;
+            if (this.panel.current?.id === st.place.id && this.panel.openedBy === 'ring') this.panel.close('away');
+          }
         }
       }
       const target = inside ? 1 : d < r + 12 ? 0.55 : 0.28;
@@ -169,7 +186,7 @@ export class Stalls {
     const fade = 1 - THREE.MathUtils.smoothstep(dist, LABEL_FAR - 25, LABEL_FAR);
     el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%) scale(${scale.toFixed(3)})`;
     el.style.opacity = fade.toFixed(2);
-    el.classList.toggle('is-active', this.panel.current?.id === st.project.id);
+    el.classList.toggle('is-active', this.panel.current?.id === st.place.id);
   }
 
   dispose(): void {
