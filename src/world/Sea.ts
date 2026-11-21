@@ -69,11 +69,13 @@ export class Sea {
           float spec = pow(max(dot(R, L), 0.0), 40.0);
           // Sun-coloured warm light on the facets facing the sun.
           col += uSun * max(dot(n, L), 0.0) * 0.12;
-          // Glitter: random cells blink on, biased toward the sun's side.
-          vec2 cell = floor(vWorld.xz * 1.6);
+          // Glitter: small round glints that blink on, biased toward the sun's side.
+          vec2 gp = vWorld.xz * 3.2;
+          vec2 cell = floor(gp);
+          float dot0 = smoothstep(0.32, 0.0, length(fract(gp) - 0.5));
           float blink = hash(cell + floor(uTime * 3.0 + hash(cell) * 7.0));
           float sunSide = 0.35 + 0.65 * max(dot(normalize(vec3(L.x, 0.0, L.z)), normalize(vec3(-V.x, 0.0, -V.z))), 0.0);
-          float glitter = smoothstep(0.965, 1.0, blink) * sunSide * smoothstep(-3.0, -10.0, shore);
+          float glitter = smoothstep(0.95, 1.0, blink) * dot0 * sunSide * smoothstep(-3.0, -10.0, shore) * 1.6;
           col += uSun * (spec * 1.4 + glitter * 1.1);
           // Foam where the swell slaps the wall.
           float foam = smoothstep(-2.6, -0.4, shore + sin(vWorld.z * 0.9 + uTime * 2.0) * 0.5);
