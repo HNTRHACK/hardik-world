@@ -119,6 +119,7 @@ export class Experience {
     this.rickshaw.update(0);
     this.fx = new RickshawFX(this.scene, this.rickshaw, this.input);
     this.environment.bindMood(this.mood);
+    this.post.bindMood(this.mood);
     this.world.bindMood(this.mood);
   }
 
@@ -158,7 +159,7 @@ export class Experience {
     this.camera.update(delta);
     this.stalls.update(elapsed, delta, this.rickshaw, this.camera.instance, this.sizes.width, this.sizes.height);
     this.environment.follow(this.camera.target, this.camera.instance.position);
-    updateOcclusion(this.camera.instance.position, this.rickshaw.position);
+    updateOcclusion(this.camera.instance, this.rickshaw.position, delta);
     this.minimap?.update(this.rickshaw.position.x, this.rickshaw.position.z, this.rickshaw.physics.yaw, this.panel.current?.id ?? null);
     if (this.post.enabled) this.post.render(this.scene, this.camera.instance);
     else {

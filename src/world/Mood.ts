@@ -8,22 +8,25 @@ import { globals } from './geo/patches';
  * golden hour back. Systems register a callback; shaders read `globals.uDusk`.
  */
 export class Mood {
-  /** 0 = golden hour, 1 = dusk. */
-  dusk = 0;
-  readonly settings = { auto: true, idleBeforeDusk: 25, fadeSeconds: 14 };
+  /** 0 = golden hour, 1 = dusk. Starts at sunset (`settings.base`). */
+  dusk = 0.36;
+  /** base: the resting time of day while driving (sunset, between golden hour and dusk). */
+  readonly settings = { auto: true, base: 0.36, idleBeforeDusk: 25, fadeSeconds: 14 };
   private idle = 0;
   private manual: number | null = null;
   private readonly listeners: ((d: number) => void)[] = [];
   private last = -1;
 
   constructor(debug: Debug) {
+    globals.uDusk.value = this.dusk;
     const f = debug.folder('Time of day');
     if (f) {
-      const state = { dusk: 0 };
+      const state = { dusk: this.settings.base };
       f.add(this.settings, 'auto').name('dusk when idle');
       f.add(state, 'dusk', 0, 1, 0.01)
         .name('dusk (manual)')
         .onChange((v: number) => this.set(v));
+      f.add(this.settings, 'base', 0, 1, 0.01).name('resting time (0 golden, 1 dusk)');
       f.add(this.settings, 'idleBeforeDusk', 3, 120, 1).name('idle seconds');
     }
   }
@@ -44,7 +47,7 @@ export class Mood {
   update(delta: number, active: boolean): void {
     if (this.manual !== null) return;
     this.idle = active ? 0 : this.idle + delta;
-    const target = this.settings.auto && this.idle > this.settings.idleBeforeDusk ? 1 : 0;
+    const target = this.settings.auto && this.idle > this.settings.idleBeforeDusk ? 1 : this.settings.base;
     // Brighten back quickly when you start driving; fade to dusk slowly.
     const rate = target < this.dusk ? 1 / 2.5 : 1 / this.settings.fadeSeconds;
     this.dusk += (target - this.dusk) * (1 - Math.exp(-rate * delta));
