@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GeoBuilder } from '../world/geo/GeoBuilder';
 import { Rng } from '../world/geo/rng';
-import { withOcclusion } from '../world/geo/occlusion';
+import { withOcclusion, withRim } from '../world/geo/patches';
 import { palette } from '../world/palette';
 
 /** A collider in the stall's local frame (+Z faces the road). */
@@ -72,7 +72,8 @@ export class Kit {
   /** Bake the vertex-coloured geometry into one shadow-casting mesh. */
   finish(labelHeight: number): StallModel {
     const geo = this.track(this.g.build());
-    const mat = this.track(withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, flatShading: true })));
+    // Rim light: a warm fresnel edge so every stall reads clearly from the high follow camera.
+    const mat = this.track(withRim(withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, flatShading: true }))));
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = mesh.receiveShadow = true;
     this.root.add(mesh);
