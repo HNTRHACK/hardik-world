@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Physics } from '../physics/Physics';
 import { GeoBuilder } from './geo/GeoBuilder';
 import { Rng } from './geo/rng';
-import { withOcclusion, withWind } from './geo/patches';
+import { addOccluder, nextOccluderId, withOcclusion, withWind } from './geo/patches';
 import { CHOWK, normalOf, quadsOverlap, rectCorners, seaClearance, type Plot, type RoadNet } from './layout';
 import type { SignAtlas } from './Signs';
 import { palette } from './palette';
@@ -140,6 +140,10 @@ export function placeLots(net: RoadNet, plots: Plot[], rng: Rng): Lot[] {
 interface Instances {
   tanks: THREE.Matrix4[];
   acs: THREE.Matrix4[];
+  /** cutaway occluder id per instance (the building it sits on) */
+  tankIds: number[];
+  acIds: number[];
+  current: number;
 }
 
 export class Buildings {
@@ -155,13 +159,18 @@ export class Buildings {
     this.lots = placeLots(net, plots, rng);
 
     const chunks = new Map<string, { g: GeoBuilder; lit: GeoBuilder; signs: GeoBuilder }>();
-    const inst: Instances = { tanks: [], acs: [] };
+    const inst: Instances = { tanks: [], acs: [], tankIds: [], acIds: [], current: 0 };
     let sign = 0;
     for (const lot of this.lots) {
       const key = `${Math.floor(lot.x / CHUNK)},${Math.floor(lot.z / CHUNK)}`;
       let c = chunks.get(key);
       if (!c) chunks.set(key, (c = { g: new GeoBuilder(), lit: new GeoBuilder(), signs: new GeoBuilder({ uv: true }) }));
+      // Tag everything this building adds, so the cutaway can fade it as a whole.
+      const id = nextOccluderId();
+      c.g.tag = c.lit.tag = c.signs.tag = inst.current = id;
       sign = this.build(lot, c.g, c.lit, c.signs, inst, rng, atlas, sign);
+      // Box covers galleries, laundry and roof tanks.
+      if (id) addOccluder({ x: lot.x, z: lot.z, hw: lot.w / 2 + 0.6, hd: lot.d / 2 + 0.6, height: lot.height + 3.2, yaw: lot.yaw });
       physics.world.createCollider(
         physics.R.ColliderDesc.cuboid(lot.w / 2, lot.height / 2, lot.d / 2)
           .setTranslation(lot.x, lot.height / 2, lot.z)
@@ -217,11 +226,12 @@ export class Buildings {
     ag.box(0, 0, 0, 0.85, 0.55, 0.36, palette.acBody);
     ag.cylinder(0.12, 0, 0.181, 0.2, 0.2, 0.01, 10, palette.acGrille, { rx: Math.PI / 2 });
     ag.box(0, -0.3, -0.05, 0.9, 0.04, 0.3, palette.kerbBlack);
-    for (const [b, list, shadow] of [
-      [tg, inst.tanks, true],
-      [ag, inst.acs, false],
+    for (const [b, list, ids, shadow] of [
+      [tg, inst.tanks, inst.tankIds, true],
+      [ag, inst.acs, inst.acIds, false],
     ] as const) {
       const geo = b.build();
+      geo.setAttribute('occId', new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, ids.length)).fill(0).map((_, i) => ids[i] ?? 0), 1));
       const m = withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, flatShading: true }));
       const mesh = new THREE.InstancedMesh(geo, m, Math.max(1, list.length));
       list.forEach((mx, i) => mesh.setMatrixAt(i, mx));
@@ -249,12 +259,14 @@ export class Buildings {
     frame(lit);
     frame(sg);
     const world = new THREE.Matrix4().makeRotationY(lot.yaw).setPosition(lot.x, 0, lot.z);
-    const place = (list: THREE.Matrix4[], x: number, y: number, z: number, ry = 0, s = 1) =>
+    const place = (list: THREE.Matrix4[], x: number, y: number, z: number, ry = 0, s = 1) => {
+      (list === inst.tanks ? inst.tankIds : inst.acIds).push(inst.current);
       list.push(
         new THREE.Matrix4()
           .compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(s, s, s))
           .premultiply(world),
       );
+    };
 
     // One golden-hour family: every paint is pulled toward warm sand and slightly desaturated.
     const paint = new THREE.Color(rng.pick(PAINTS))

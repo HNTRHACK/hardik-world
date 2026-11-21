@@ -13,6 +13,9 @@ export class GeoBuilder {
   readonly uv: number[] = [];
   /** Per-vertex wind weight (0 = fixed, 1 = free); see withWind(). */
   readonly sway: number[] = [];
+  /** Per-vertex cutaway occluder id (see addOccluder); 0 = none. Applies to vertices pushed while set. */
+  tag = 0;
+  readonly tags: number[] = [];
   private readonly withUv: boolean;
   private readonly m = new THREE.Matrix4();
   private readonly tmpM = new THREE.Matrix4();
@@ -47,6 +50,7 @@ export class GeoBuilder {
     this.pos.push(p.x, p.y, p.z);
     this.col.push(c.r, c.g, c.b);
     this.sway.push(0);
+    this.tags.push(this.tag);
     if (this.withUv) this.uv.push(u, v);
   }
 
@@ -273,6 +277,7 @@ export class GeoBuilder {
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     if (this.withUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     if (this.sway.some((v) => v > 0)) g.setAttribute('sway', new THREE.Float32BufferAttribute(this.sway, 1));
+    if (this.tags.some((v) => v > 0)) g.setAttribute('occId', new THREE.Float32BufferAttribute(this.tags, 1));
     g.computeVertexNormals(); // non-indexed → face normals (needed for shadow normal bias)
     g.computeBoundingSphere();
     return g;

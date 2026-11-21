@@ -16,7 +16,7 @@ import { StreetLife } from './StreetLife';
 import { Atmosphere } from './Atmosphere';
 import { ContactShadows } from './ContactShadows';
 import type { Mood } from './Mood';
-import { globals, rim } from './geo/patches';
+import { globals, occlusion, rim } from './geo/patches';
 
 /**
  * The neighbourhood: one place that builds every street system in the right
@@ -84,6 +84,11 @@ export class World {
     const f = debug.folder('Look');
     if (!f) return;
     f.add(rim.uRimStrength, 'value', 0, 2, 0.01).name('stall rim light');
+    const o = occlusion.settings;
+    f.add(o, 'enabled').name('cutaway buildings');
+    f.add(o, 'zoneX', 0.1, 1, 0.01).name('cutaway zone width');
+    f.add(o, 'zoneTop', -0.3, 1, 0.01).name('cutaway zone top');
+    f.add(o, 'fadeSeconds', 0.02, 1, 0.01).name('cutaway fade (s)');
     f.add(globals.uWind.value, 'x', -2, 2, 0.01).name('wind x');
     f.add(globals.uWind.value, 'y', -2, 2, 0.01).name('wind z');
     f.add(this.contact.mesh, 'visible').name('contact shadows');
