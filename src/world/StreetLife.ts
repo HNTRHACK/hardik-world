@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { Physics } from '../physics/Physics';
 import { GeoBuilder } from './geo/GeoBuilder';
 import { Rng } from './geo/rng';
-import { withOcclusion } from './geo/occlusion';
+import { withOcclusion, withWind } from './geo/patches';
+import type { Mood } from './Mood';
 import { CHOWK, PROMENADE_WIDTH, seaX, type RoadNet } from './layout';
 import type { Lot } from './Buildings';
 import type { Spots } from './spots';
@@ -33,13 +34,104 @@ export class StreetLife {
     this.trees();
     this.scooters();
     this.handcarts();
+    this.bunting();
     scene.add(this.group);
+  }
+
+  /** Lamp heads (emissive) and the warm pools of light they throw: both driven by dusk. */
+  lampGlow: THREE.MeshStandardMaterial | null = null;
+  poolMaterial: THREE.MeshBasicMaterial | null = null;
+
+  bindMood(mood: Mood): void {
+    mood.on((t) => {
+      if (this.lampGlow) this.lampGlow.emissiveIntensity = THREE.MathUtils.lerp(0.35, 3.4, t);
+      if (this.poolMaterial) this.poolMaterial.opacity = THREE.MathUtils.lerp(0.04, 0.55, t);
+    });
+  }
+
+  private lightPools(posts: Placement[]): void {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d')!;
+    const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,214,150,1)');
+    grd.addColorStop(0.45, 'rgba(255,190,120,0.45)');
+    grd.addColorStop(1, 'rgba(255,170,100,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.05, fog: false });
+    const mesh = new THREE.InstancedMesh(geo, mat, posts.length);
+    const m = new THREE.Matrix4();
+    posts.forEach((p, i) => {
+      const x = p.x + Math.sin(p.yaw) * 1.6;
+      const z = p.z + Math.cos(p.yaw) * 1.6;
+      m.makeScale(7.5, 1, 7.5).setPosition(x, 0.17, z);
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.renderOrder = 3;
+    mesh.computeBoundingSphere();
+    this.group.add(mesh);
+    this.poolMaterial = mat;
+    this.disposables.push(tex, geo, mat);
+  }
+
+  /** Festive bunting strung across the gali and the spokes; the pennants flutter. */
+  private bunting(): void {
+    const rng = this.rng;
+    const g = new GeoBuilder();
+    const colors = [0xf2a33a, 0xf6ead7, 0x3f8f55, 0xc8302a, 0x2f6db5, 0xf2c230, 0xe86fa0];
+    const string = new THREE.Color(0x2a2523);
+    for (const [id, step] of [
+      ['lane', 11],
+      ['west', 9],
+      ['east', 10],
+    ] as const) {
+      const road = this.net.get(id);
+      for (let s = 6; s < road.length - 4; s += step) {
+        const p = road.at(s / road.length);
+        if (this.net.clearance(p.x, p.z, road) < 4) continue; // not over junctions
+        const half = road.def.halfWidth + road.def.footpath + 0.3;
+        const nx = -p.tz;
+        const nz = p.tx;
+        const y = rng.range(5.4, 6.2);
+        const a = new THREE.Vector3(p.x - nx * half, y, p.z - nz * half);
+        const b = new THREE.Vector3(p.x + nx * half, y + rng.range(-0.3, 0.3), p.z + nz * half);
+        const sag = 0.55;
+        const at = (t: number) => new THREE.Vector3().lerpVectors(a, b, t).setY(THREE.MathUtils.lerp(a.y, b.y, t) - sag * 4 * t * (1 - t));
+        const n = Math.floor(a.distanceTo(b) / 0.42);
+        let prev = at(0);
+        for (let k = 1; k <= 12; k++) {
+          const q = at(k / 12);
+          g.rod(prev, q, 0.012, string);
+          prev = q;
+        }
+        for (let k = 1; k < n; k++) {
+          const t = k / n;
+          const top = at(t);
+          const l = at(t - 0.38 / n); // pennants ≈ 0.32 m wide
+          const r = at(t + 0.38 / n);
+          const s0 = g.vertexCount;
+          g.tri(l, r, top.clone().setY(top.y - 0.38), colors[(k + s) % colors.length]!);
+          g.markSway(s0, top.y, 0.38);
+        }
+      }
+    }
+    const geo = g.build();
+    const mat = withWind(withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide })), 0.22);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    this.group.add(mesh);
+    this.disposables.push(geo, mat);
   }
 
   // ── helpers ──
 
-  private instanced(b: GeoBuilder, list: Placement[], o: { shadow?: boolean; emissive?: number; tint?: boolean; occlude?: boolean } = {}): void {
-    if (!list.length) return;
+  private instanced(b: GeoBuilder, list: Placement[], o: { shadow?: boolean; emissive?: number; tint?: boolean; occlude?: boolean } = {}): THREE.InstancedMesh | null {
+    if (!list.length) return null;
     const geo = b.build();
     const params: THREE.MeshStandardMaterialParameters = { vertexColors: true, roughness: 0.75, flatShading: true };
     if (o.emissive !== undefined) Object.assign(params, { emissive: o.emissive, emissiveIntensity: 1.1 });
@@ -61,6 +153,7 @@ export class StreetLife {
     mesh.computeBoundingSphere();
     this.group.add(mesh);
     this.disposables.push(geo, mat);
+    return mesh;
   }
 
   private fixedCylinder(x: number, z: number, r: number, h: number): void {
@@ -162,7 +255,9 @@ export class StreetLife {
     this.instanced(g, posts, { shadow: true });
     const glow = new GeoBuilder();
     glow.box(0, 6.31, 1.6, 0.24, 0.05, 0.5, palette.lampGlow, { bottom: true, skip: 4 });
-    this.instanced(glow, posts, { emissive: palette.lampGlow });
+    const lit = this.instanced(glow, posts, { emissive: palette.lampGlow });
+    this.lampGlow = lit?.material as THREE.MeshStandardMaterial;
+    this.lightPools(posts);
   }
 
   // ── electric poles + wires ──
