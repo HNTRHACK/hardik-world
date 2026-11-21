@@ -28,6 +28,8 @@ export class RickshawFX {
   private readonly v = new THREE.Vector3();
   private readonly s = new THREE.Vector3();
   private emitClock = 0;
+  /** 0..1 how hard the tyres are sliding (read by the sound layer). */
+  skid = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -188,6 +190,7 @@ export class RickshawFX {
     const slip = Math.abs(lin.x * right.x + lin.z * right.z);
     const braking = (this.input.throttle < -0.1 && p.forwardSpeed > 4) || (this.input.down.has('handbrake') && speed > 3);
     const skidding = p.contacts >= 3 && (slip > 2.4 || braking);
+    this.skid = skidding ? Math.min(1, 0.25 + Math.max(0, slip - 2.4) / 6 + (braking ? 0.25 : 0)) * Math.min(1, speed / 4) : 0;
 
     // Dust: emit at the rear wheels while skidding, a few per wheel per second-ish.
     this.emitClock += delta;
