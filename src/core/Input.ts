@@ -1,6 +1,6 @@
 import { Emitter } from './Emitter';
 
-export type Action = 'forward' | 'backward' | 'left' | 'right' | 'handbrake' | 'boost' | 'reset';
+export type Action = 'forward' | 'backward' | 'left' | 'right' | 'handbrake' | 'boost' | 'reset' | 'horn';
 
 const KEYS: Record<string, Action> = {
   KeyW: 'forward',
@@ -15,11 +15,13 @@ const KEYS: Record<string, Action> = {
   ShiftLeft: 'boost',
   ShiftRight: 'boost',
   KeyR: 'reset',
+  KeyH: 'horn',
 };
 
 /**
  * Keyboard state by action (physical key codes, so WASD works on AZERTY too).
- * The mobile joystick (milestone 7) writes into the same analog axes.
+ * The touch controls write into the same state: `analog` axes from the
+ * joystick and `hold()` for the buttons, so the rest of the game can't tell.
  */
 export class Input extends Emitter<{ press: Action; first: void }> {
   readonly down = new Set<Action>();
@@ -39,11 +41,38 @@ export class Input extends Emitter<{ press: Action; first: void }> {
       this.down.add(action);
       this.emit('press', action);
     }
-    if (!this.touched) {
-      this.touched = true;
-      this.emit('first', undefined);
-    }
+    this.markFirst();
   };
+
+  /** Touch buttons: hold an action down (or release it). */
+  hold(action: Action, on: boolean): void {
+    if (on && !this.down.has(action)) {
+      this.down.add(action);
+      this.emit('press', action);
+      this.markFirst();
+    } else if (!on) this.down.delete(action);
+  }
+
+  /** Joystick axes (null releases them back to the keyboard). */
+  setAnalog(throttle: number, steer: number): void {
+    this.analog = { throttle, steer };
+    if (throttle || steer) this.markFirst();
+  }
+
+  releaseAnalog(): void {
+    this.analog = null;
+  }
+
+  /** Anything is being driven right now (keys, buttons or stick). */
+  get active(): boolean {
+    return this.down.size > 0 || (this.analog !== null && (this.analog.throttle !== 0 || this.analog.steer !== 0));
+  }
+
+  private markFirst(): void {
+    if (this.touched) return;
+    this.touched = true;
+    this.emit('first', undefined);
+  }
 
   private readonly onUp = (e: KeyboardEvent) => {
     const action = KEYS[e.code];
