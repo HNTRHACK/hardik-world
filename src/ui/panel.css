@@ -71,7 +71,7 @@
 /* ── Project panel ── */
 .panel {
   position: fixed;
-  top: 68px; /* clear of the always-visible "Skip to classic site" button */
+  top: 64px; /* clear of the always-visible "Classic site" link */
   right: 16px;
   bottom: 16px;
   z-index: 30;
@@ -333,4 +333,143 @@
   .stall-label__icon {
     transition: none;
   }
+}
+
+/* ── About / Contact / Wins extras ── */
+.panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--sheet-rule);
+  border-radius: 999px;
+  font-size: 13px;
+}
+.panel__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3f8f55;
+}
+.panel__prose {
+  margin-top: 22px;
+}
+.panel__prose p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #3a322c;
+}
+.panel__prose p + p {
+  margin-top: 12px;
+}
+.panel__section-title {
+  margin-top: 30px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 24px;
+}
+.panel__section-title + .panel__facts {
+  margin-top: 10px;
+}
+.panel__facts--skills > div {
+  grid-template-columns: 92px 1fr;
+}
+.panel__timeline,
+.panel__wins {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--sheet-rule);
+}
+.panel__timeline li,
+.panel__wins li {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sheet-rule);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.panel__wins {
+  margin-top: 26px;
+}
+.panel__when {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sheet-mute);
+  padding-top: 1px;
+}
+.panel__muted {
+  color: var(--sheet-mute);
+}
+.panel__small {
+  margin-top: 20px;
+  font-size: 13px;
+}
+.panel__email {
+  display: grid;
+  gap: 6px;
+  margin-top: 26px;
+}
+.panel__email-label {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-mute);
+}
+.panel__copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--sheet-rule);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sheet-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.panel__copy:hover {
+  border-color: var(--sheet-ink);
+}
+.panel__email-addr {
+  font-family: var(--display);
+  font-size: clamp(20px, 3.4vw, 24px);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.panel__copy-tag {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sheet-mute);
+}
+.panel__copy.is-copied {
+  background: rgb(63 143 85 / 0.08);
+  border-color: #3f8f55;
+}
+.panel__copy.is-copied .panel__copy-tag {
+  color: #2f6b40;
+}
+.panel__copy.is-copied .panel__copy-tag::before {
+  content: 'Copied';
+}
+.panel__copy.is-copied .panel__copy-tag {
+  font-size: 0;
+}
+.panel__copy.is-copied .panel__copy-tag::before {
+  font-size: 12px;
+}
+.panel__copy-status {
+  min-height: 1.2em;
+  font-size: 12.5px;
+  color: var(--sheet-mute);
 }
