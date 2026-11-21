@@ -5,6 +5,8 @@ export interface TickInfo {
   delta: number;
   /** Seconds since start, paused while the tab is hidden. */
   elapsed: number;
+  /** Real, unclamped frame time (for the adaptive-quality monitor). */
+  raw: number;
 }
 
 /**
@@ -12,7 +14,7 @@ export interface TickInfo {
  * giant delta, so physics never "catches up" after you switch tabs.
  */
 export class Time extends Emitter<{ tick: TickInfo }> {
-  readonly info: TickInfo = { delta: 1 / 60, elapsed: 0 };
+  readonly info: TickInfo = { delta: 1 / 60, elapsed: 0, raw: 1 / 60 };
   private last = 0;
   private raf = 0;
   private running = false;
@@ -37,7 +39,9 @@ export class Time extends Emitter<{ tick: TickInfo }> {
 
   private loop = (now: number): void => {
     if (!this.running) return;
-    this.info.delta = Math.min((now - this.last) / 1000, this.maxDelta);
+    // rAF timestamps can be a hair older than the performance.now() taken in start(): never go negative.
+    this.info.raw = Math.max(0, (now - this.last) / 1000);
+    this.info.delta = Math.min(this.info.raw, this.maxDelta);
     this.info.elapsed += this.info.delta;
     this.last = now;
     this.emit('tick', this.info);

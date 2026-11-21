@@ -18,6 +18,11 @@ import { ProjectPanel } from './ui/ProjectPanel';
 import { PlacesMenu } from './ui/PlacesMenu';
 import { Minimap } from './ui/Minimap';
 import { PLACES } from './stalls/places';
+import { PostFX } from './render/PostFX';
+import { Quality } from './render/Quality';
+import { Mood } from './world/Mood';
+import { globals } from './world/geo/patches';
+import { RickshawFX } from './vehicle/RickshawFX';
 
 /** Owns every system. One instance per page; `dispose()` frees all GPU resources. */
 export class Experience {
@@ -36,6 +41,10 @@ export class Experience {
   readonly panel = new ProjectPanel();
   private hint!: ControlsHint;
   private menu!: PlacesMenu;
+  post!: PostFX;
+  quality!: Quality;
+  mood!: Mood;
+  private fx!: RickshawFX;
   private minimap!: Minimap;
   private readonly offTick: () => void;
 
@@ -49,8 +58,17 @@ export class Experience {
   async start(): Promise<void> {
     // Debug must exist before any system asks it for a folder.
     await this.debug.init();
+    this.mood = new Mood(this.debug);
     this.camera = new Camera(this.sizes, this.debug);
     this.renderer = new Renderer(this.container, this.sizes, this.debug);
+    this.post = new PostFX(this.renderer.instance, this.debug);
+    this.quality = new Quality((l) => {
+      this.post.params.enabled = l.post;
+      this.post.params.bloom = l.bloom;
+      this.post.setSamples(l.msaa);
+      this.sizes.setMaxPixelRatio(l.maxPixelRatio);
+      this.environment?.setShadowMapSize(l.shadowMap);
+    }, this.debug);
     const progress = new Progress((ratio, label) => this.loader.set(ratio, label));
     const physicsReady = Physics.load();
     await progress.run([
@@ -65,15 +83,19 @@ export class Experience {
         },
       },
     ]);
-    // Compile every shader up front so the first frame doesn't hitch (async where the GPU supports it).
+    // Compile every shader up front, for the same output the first frame will use (the post
+    // target or the screen: they compile differently), so the first frame doesn't hitch.
     const r = this.renderer.instance;
+    r.setRenderTarget(this.post.enabled ? this.post.target : null);
     if (r.extensions.has('KHR_parallel_shader_compile')) await r.compileAsync(this.scene, this.camera.instance);
     else r.compile(this.scene, this.camera.instance);
+    r.setRenderTarget(null);
     this.loader.set(1, 'Ready');
     await this.camera.enableDebugOrbit(this.renderer.instance.domElement);
     this.camera.enableUserControl(this.renderer.instance.domElement);
     this.camera.jump(this.rickshaw.position);
-    this.renderer.instance.render(this.scene, this.camera.instance);
+    if (this.post.enabled) this.post.render(this.scene, this.camera.instance);
+    else this.renderer.instance.render(this.scene, this.camera.instance);
     this.loader.done();
     this.hint = new ControlsHint(this.input);
     this.menu = new PlacesMenu(PLACES);
@@ -89,11 +111,15 @@ export class Experience {
     await Promise.all(
       ['400 40px "Instrument Serif"', '600 20px "Instrument Sans"', '700 40px "Baloo 2"'].map((f) => document.fonts.load(f).catch(() => [])),
     );
-    this.environment = new Environment(this.scene, this.debug);
+    this.environment = new Environment(this.scene, this.renderer.instance, this.debug);
+    this.environment.setShadowMapSize(this.quality.current.shadowMap);
     this.world = await World.create(this.scene, this.physics, this.debug, this.environment.sunDirection);
     this.stalls = new Stalls(this.scene, this.physics, this.world.plots, this.panel);
     this.rickshaw = new Rickshaw(this.scene, this.physics, this.input, this.world.spawn);
     this.rickshaw.update(0);
+    this.fx = new RickshawFX(this.scene, this.rickshaw, this.input);
+    this.environment.bindMood(this.mood);
+    this.world.bindMood(this.mood);
   }
 
   /**
@@ -115,10 +141,15 @@ export class Experience {
     this.stalls.open(id, 'ring');
   }
 
-  private readonly update = ({ delta, elapsed }: TickInfo): void => {
+  private readonly update = ({ delta, elapsed, raw }: TickInfo): void => {
+    globals.uTime.value = elapsed;
+    this.quality.sample(raw);
+    const active = this.input.down.size > 0 || Math.abs(this.rickshaw.speed) > 0.6 || this.camera.userControlled;
+    this.mood.update(delta, active);
     this.physics.update(delta, (dt) => this.rickshaw.fixedUpdate(dt));
     this.rickshaw.update(delta);
     this.world.update(elapsed, delta, this.rickshaw.position);
+    this.fx.update(elapsed, delta);
     this.camera.follow(this.rickshaw.position, this.rickshaw.velocity, delta);
     // Keep the stall and rickshaw in view beside (desktop) or above (phone) an open panel.
     const w = this.sizes.width;
@@ -129,13 +160,19 @@ export class Experience {
     this.environment.follow(this.camera.target, this.camera.instance.position);
     updateOcclusion(this.camera.instance.position, this.rickshaw.position);
     this.minimap?.update(this.rickshaw.position.x, this.rickshaw.position.z, this.rickshaw.physics.yaw, this.panel.current?.id ?? null);
-    this.renderer.instance.render(this.scene, this.camera.instance);
+    if (this.post.enabled) this.post.render(this.scene, this.camera.instance);
+    else {
+      this.renderer.instance.setRenderTarget(null);
+      this.renderer.instance.render(this.scene, this.camera.instance);
+    }
   };
 
   dispose(): void {
     this.offTick();
     this.time.dispose();
     this.hint?.dispose();
+    this.fx?.dispose();
+    this.post?.dispose();
     this.menu?.dispose();
     this.minimap?.dispose();
     this.rickshaw?.dispose();
