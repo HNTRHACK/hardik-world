@@ -28,7 +28,9 @@ export class Minimap {
   ) {
     this.root = document.querySelector<HTMLElement>('[data-minimap]')!;
     const small = matchMedia('(max-width: 640px)').matches;
-    this.w = small ? 112 : 150;
+    const short = matchMedia('(max-height: 500px)').matches; // phone in landscape
+    const touch = matchMedia('(pointer: coarse)').matches;
+    this.w = short ? 80 : small ? 112 : 105; // desktop: compact, the street is the show
     this.h = Math.round((this.w * (BOUNDS.z1 - BOUNDS.z0)) / (BOUNDS.x1 - BOUNDS.x0));
     this.root.innerHTML = `
       <button class="minimap__toggle" type="button" aria-pressed="true" data-minimap-toggle>${MAP_ICON}<span class="visually-hidden">Map</span></button>
@@ -42,7 +44,7 @@ export class Minimap {
     this.g = this.canvas.getContext('2d')!;
     this.base = this.drawBase(net);
 
-    let visible = !small;
+    let visible = !small && !touch; // touch screens: the controls come first; one tap shows it
     try {
       const saved = localStorage.getItem(KEY);
       if (saved !== null) visible = saved === '1';

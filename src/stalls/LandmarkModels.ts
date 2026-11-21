@@ -64,17 +64,20 @@ export function billboard(): StallModel {
   const W = 8.4;
   const H = 3.6;
   const y0 = 2.9;
-  // Legs, braces, catwalk with railing, lamp arms
+  // Legs, braces, catwalk with railing, lamp arms. The legs stop under the board (never
+  // across the lettering, from either face) and a stiff box frame carries the board.
   for (const x of [-2.9, 2.9]) {
-    g.box(x, (y0 + H) / 2, -0.35, 0.22, y0 + H, 0.22, steel);
+    g.box(x, y0 / 2, -0.35, 0.22, y0, 0.22, steel);
     g.rod({ x, y: 0.2, z: -1.4 }, { x, y: y0 + 0.2, z: -0.4 }, 0.06, steel);
     g.box(x, 0.12, -0.6, 0.6, 0.24, 1.8, 0x6e6a64); // footing
   }
   g.rod({ x: -2.9, y: 0.8, z: -0.35 }, { x: 2.9, y: y0 - 0.2, z: -0.35 }, 0.05, steel);
   g.rod({ x: 2.9, y: 0.8, z: -0.35 }, { x: -2.9, y: y0 - 0.2, z: -0.35 }, 0.05, steel);
   g.box(0, y0 - 0.12, 0.2, W + 0.4, 0.08, 0.8, steel); // catwalk
-  for (let x = -W / 2; x <= W / 2 + 0.01; x += 0.7) g.box(x, y0 - 0.12 + 0.45, 0.58, 0.04, 0.9, 0.04, steel);
-  g.box(0, y0 + 0.78, 0.58, W + 0.4, 0.04, 0.04, steel);
+  // low railing: its top sits below the painted border, so it never crosses the text
+  for (let x = -W / 2; x <= W / 2 + 0.01; x += 0.7) g.box(x, y0 - 0.12 + 0.2, 0.58, 0.04, 0.4, 0.04, steel);
+  g.box(0, y0 + 0.28, 0.58, W + 0.4, 0.04, 0.04, steel);
+  g.box(0, y0 - 0.02, -0.35, W - 1.2, 0.2, 0.24, steel); // header beam the board stands on
   g.box(0, y0 + H / 2, -0.12, W + 0.3, H + 0.3, 0.18, 0x6b1a14); // board back + frame
   const lamps: THREE.Mesh[] = [];
   const lampGeo = k.track(new THREE.BoxGeometry(0.4, 0.08, 0.22));
