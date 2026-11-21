@@ -6,17 +6,20 @@ import { Sky } from './Sky';
 /** Golden-hour and dusk values for everything the light touches. */
 const LOOK = {
   sun: [0xffc48a, 0xff8f62],
-  sunIntensity: [4.0, 1.2],
+  sunIntensity: [4.6, 1.2],
   hemiSky: [0xbcc6dc, 0x5b6aa6],
   hemiGround: [0xcf9160, 0x6d4660],
-  hemiIntensity: [1.15, 1.0],
-  fog: [0xe8b98e, 0x8c6c88],
+  hemiIntensity: [0.85, 1.0],
+  fog: [0xe4ab80, 0x8c6c88],
+  /** distance fog near/far: golden hour sees far, dusk closes in */
+  fogNear: [80, 40],
+  fogFar: [230, 125],
   skyTop: [0x6f92bd, 0x2a3765],
   skyMid: [0xf4c08c, 0xd98a72],
   skyGlow: [0xffa260, 0xff6f4a],
   cloudLit: [0xffe1bd, 0xffa98a],
   cloudShade: [0xb89aa8, 0x5e4b6e],
-  exposure: [0.95, 1.05],
+  exposure: [1.08, 1.05],
 } as const;
 
 /**
@@ -79,6 +82,8 @@ export class Environment {
       this.hemi.intensity = THREE.MathUtils.lerp(LOOK.hemiIntensity[0], LOOK.hemiIntensity[1], t);
       const fog = this.scene.fog as THREE.Fog;
       lerp(LOOK.fog, fog.color);
+      fog.near = THREE.MathUtils.lerp(LOOK.fogNear[0], LOOK.fogNear[1], t);
+      fog.far = THREE.MathUtils.lerp(LOOK.fogFar[0], LOOK.fogFar[1], t);
       (this.scene.background as THREE.Color).copy(fog.color);
       const u = this.sky.uniforms;
       lerp(LOOK.skyTop, u.uTop!.value);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Debug } from '../core/Debug';
+import type { Mood } from '../world/Mood';
 import { globals } from '../world/geo/patches';
 
 /*
@@ -46,7 +47,7 @@ export class PostFX {
     threshold: 1.0,
     knee: 0.5,
     vignette: 0.32,
-    grain: 0.028,
+    grain: 0.022,
     saturation: 1.1,
     contrast: 1.1,
     heightFog: 0.32,
@@ -54,6 +55,15 @@ export class PostFX {
     fogDensity: 0.009,
     toneMapping: 'ACES' as 'AgX' | 'ACES',
   };
+  /**
+   * Golden-hour vs dusk grade. Golden hour stays crisp (almost no haze, more
+   * punch); the haze only thickens as the light goes. Re-applied on mood change.
+   */
+  readonly look = {
+    heightFog: [0.05, 0.3],
+    saturation: [1.24, 1.1],
+    contrast: [1.22, 1.12],
+  } as const;
   private readonly scene: THREE.WebGLRenderTarget;
   private readonly mips: THREE.WebGLRenderTarget[] = [];
   private readonly quad: THREE.Mesh;
@@ -147,7 +157,13 @@ export class PostFX {
         uniform vec3 uFogColor, uShadowTint, uHighlightTint, uCamPos;
         uniform mat4 uProjInv, uCamWorld;
         varying vec2 vUv;
-        float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        // sin-free hash (Hoskins): the classic fract(sin()) one loses precision at
+        // screen-sized coordinates and turns grain into a regular dot pattern.
+        float hash(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
         void main() {
           vec3 col = texture2D(tScene, vUv).rgb;
           // Height fog: thick haze that hugs the ground and thins with height.
@@ -172,10 +188,20 @@ export class PostFX {
           // Display-space finish: vignette and fine animated grain (also kills banding).
           vec2 q = vUv - 0.5;
           gl_FragColor.rgb *= 1.0 - uVignette * smoothstep(0.08, 0.62, dot(q, q) * 1.6);
-          gl_FragColor.rgb += (hash(gl_FragCoord.xy + fract(uTime * 7.31) * 113.0) - 0.5) * uGrain;
+          gl_FragColor.rgb += (hash(gl_FragCoord.xy + vec2(fract(uTime * 7.31), fract(uTime * 3.17)) * 517.0) - 0.5) * uGrain;
         }`,
     });
     this.addDebug(debug);
+  }
+
+  bindMood(mood: Mood): void {
+    const p = this.params;
+    const l = this.look;
+    mood.on((t) => {
+      p.heightFog = THREE.MathUtils.lerp(l.heightFog[0], l.heightFog[1], t);
+      p.saturation = THREE.MathUtils.lerp(l.saturation[0], l.saturation[1], t);
+      p.contrast = THREE.MathUtils.lerp(l.contrast[0], l.contrast[1], t);
+    });
   }
 
   /** The HDR scene target (compile shaders against it so the first frame doesn't recompile). */
