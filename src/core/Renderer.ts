@@ -13,14 +13,16 @@ export class Renderer {
     debug: Debug,
   ) {
     this.instance = new THREE.WebGLRenderer({
-      antialias: sizes.pixelRatio < 2, // MSAA is wasted at DPR 2
+      // MSAA lives in the post-processing render target (adaptive); canvas MSAA would be paid twice.
+      antialias: false,
       powerPreference: 'high-performance',
       stencil: false,
     });
     const r = this.instance;
     r.outputColorSpace = THREE.SRGBColorSpace;
+    // ACES: filmic roll-off with rich, warm saturation (AgX is selectable under #debug).
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 1.0;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap; // r187: PCF + shadow.radius gives the soft edge
     r.setPixelRatio(sizes.pixelRatio);
@@ -32,8 +34,7 @@ export class Renderer {
       r.setSize(s.width, s.height);
     });
 
-    const f = debug.folder('Renderer');
-    f?.add(r, 'toneMappingExposure', 0.3, 2.5, 0.01).name('exposure');
+    void debug; // exposure lives in the post-processing folder
   }
 
   dispose(): void {
