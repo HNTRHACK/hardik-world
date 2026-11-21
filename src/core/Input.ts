@@ -32,7 +32,7 @@ export class Input extends Emitter<{ press: Action; first: void }> {
     const action = KEYS[e.code];
     if (!action) return;
     // Inside a panel, arrows/space scroll and press buttons; WASD still drives (and drives away).
-    if (e.target instanceof Element && e.target.closest('[data-panel]') && !e.code.startsWith('Key')) return;
+    if (e.target instanceof Element && e.target.closest('[data-panel], [data-ui]') && !e.code.startsWith('Key')) return;
     // Space/arrows would scroll or activate a focused button; the canvas owns them.
     if (e.target === document.body || e.target instanceof HTMLCanvasElement) e.preventDefault();
     if (!this.down.has(action)) {

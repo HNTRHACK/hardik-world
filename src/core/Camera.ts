@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import type { Sizes } from './Sizes';
 import type { Debug } from './Debug';
 
@@ -28,6 +29,9 @@ export class Camera {
   /** Player-controlled view (absolute yaw/pitch, zoom multiplier). */
   private readonly view = { yaw: 0, pitch: 0, zoom: 1 };
   private idle = Infinity;
+  /** An in-progress fly-to (projects menu / minimap teleports). */
+  private flight: { from: THREE.Vector3; to: THREE.Vector3; t: number; tween: gsap.core.Tween } | null = null;
+  private flightZoom = 1;
   /** Screen-space framing shift (px), eased: keeps the subject clear of an open panel. */
   private readonly shift = { x: 0, y: 0, gx: 0, gy: 0 };
   private readonly goal = new THREE.Vector3();
@@ -157,6 +161,36 @@ export class Camera {
     this.instance.setViewOffset(w, h, s.x, s.y, w, h);
   }
 
+  get flying(): boolean {
+    return this.flight !== null;
+  }
+
+  /**
+   * Glide the view to a new focus: eased, pulling back a little mid-flight so you
+   * see where you're going, and settling on the default follow angle.
+   */
+  flyTo(focus: THREE.Vector3, duration = 1.5): Promise<void> {
+    this.flight?.tween.kill();
+    this.idle = Infinity; // let the player's orbit ease back while we travel
+    const from = this.target.clone();
+    const to = focus.clone();
+    to.y += 0.4;
+    return new Promise((resolve) => {
+      const f = { from, to, t: 0, tween: null as unknown as gsap.core.Tween };
+      f.tween = gsap.to(f, {
+        t: 1,
+        duration,
+        ease: 'power2.inOut',
+        onComplete: () => {
+          this.flight = null;
+          this.flightZoom = 1;
+          resolve();
+        },
+      });
+      this.flight = f;
+    });
+  }
+
   /** Snap straight to a focus point (spawn, teleport). */
   jump(focus: THREE.Vector3): void {
     this.target.copy(focus);
@@ -166,6 +200,12 @@ export class Camera {
 
   /** Ease toward `focus`, leading along `velocity`. Frame-rate independent. */
   follow(focus: THREE.Vector3, velocity: THREE.Vector3, delta: number): void {
+    if (this.flight) {
+      const f = this.flight;
+      this.target.lerpVectors(f.from, f.to, f.t);
+      this.flightZoom = 1 + Math.sin(f.t * Math.PI) * 0.5;
+      return;
+    }
     const t = this.tuning;
     this.goal.copy(focus).addScaledVector(velocity, t.lookAhead);
     // Ignore vertical bounce from the suspension: the street is flat.
@@ -186,7 +226,7 @@ export class Camera {
   private place(): void {
     if (this.orbit?.enabled) return;
     const v = this.view;
-    const dist = this.base.dist * this.distanceScale * this.speedZoom * v.zoom;
+    const dist = this.base.dist * this.distanceScale * this.speedZoom * v.zoom * this.flightZoom;
     const c = Math.cos(v.pitch);
     this.instance.position.set(
       this.target.x + Math.sin(v.yaw) * c * dist,
@@ -218,6 +258,7 @@ export class Camera {
   }
 
   dispose(): void {
+    this.flight?.tween.kill();
     this.off();
     this.detachInput?.();
     this.orbit?.dispose();
