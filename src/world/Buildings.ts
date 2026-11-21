@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Physics } from '../physics/Physics';
 import { GeoBuilder } from './geo/GeoBuilder';
 import { Rng } from './geo/rng';
-import { withOcclusion } from './geo/occlusion';
+import { withOcclusion, withWind } from './geo/patches';
 import { CHOWK, normalOf, quadsOverlap, rectCorners, seaClearance, type Plot, type RoadNet } from './layout';
 import type { SignAtlas } from './Signs';
 import { palette } from './palette';
@@ -29,6 +29,7 @@ const RAILS = [0x2b2b2b, 0x3b6e8f, 0xf4ecdc, 0x2f5f4a];
 const CLOTHES = [0xd23b3b, 0xf2c230, 0x2f6db5, 0xe86fa0, 0x3f9d57, 0xf5f5f0, 0xf08a24, 0x7a4fa0, 0x26a3a3];
 const GOODS = [0xf2a33a, 0xd23b3b, 0x3f9d57, 0x2f6db5, 0xf2c230, 0xf5f5f0, 0x8a5a3c];
 
+const WARM = new THREE.Color(0xe6c49a);
 const H0 = 3.4; // ground floor (shops are tall)
 const HF = 3.0; // upper floors
 const CHUNK = 50;
@@ -144,6 +145,9 @@ interface Instances {
 export class Buildings {
   readonly group = new THREE.Group();
   readonly lots: Lot[];
+  /** Exposed for the dusk controller: lit windows / shop interiors and signboards. */
+  windowMaterial!: THREE.MeshStandardMaterial;
+  signMaterial!: THREE.MeshStandardMaterial;
   private readonly disposables: { dispose(): void }[] = [];
 
   constructor(scene: THREE.Scene, physics: Physics, net: RoadNet, plots: Plot[], atlas: SignAtlas) {
@@ -165,13 +169,15 @@ export class Buildings {
       );
     }
 
-    const mat = withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, flatShading: true }));
+    const mat = withWind(withOcclusion(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, flatShading: true })));
     const litMat = withOcclusion(
       new THREE.MeshStandardMaterial({ vertexColors: true, emissive: palette.windowGlow, emissiveIntensity: 0.9, roughness: 0.6, flatShading: true }),
     );
     const signMat = withOcclusion(
       new THREE.MeshStandardMaterial({ map: atlas.texture, emissiveMap: atlas.texture, emissive: 0xffffff, emissiveIntensity: 0.28, roughness: 0.65 }),
     );
+    this.windowMaterial = litMat;
+    this.signMaterial = signMat;
     this.disposables.push(mat, litMat, signMat);
     for (const c of chunks.values()) {
       for (const [b, m, shadow] of [
@@ -250,7 +256,11 @@ export class Buildings {
           .premultiply(world),
       );
 
-    const paint = new THREE.Color(rng.pick(PAINTS)).offsetHSL(rng.range(-0.015, 0.015), rng.range(-0.06, 0.04), rng.range(-0.05, 0.03));
+    // One golden-hour family: every paint is pulled toward warm sand and slightly desaturated.
+    const paint = new THREE.Color(rng.pick(PAINTS))
+      .offsetHSL(rng.range(-0.015, 0.015), rng.range(-0.06, 0.02), rng.range(-0.05, 0.03))
+      .lerp(WARM, 0.2)
+      .offsetHSL(0, -0.06, 0);
     const trim = new THREE.Color(rng.pick(TRIMS));
     const rail = rng.pick(RAILS);
     const wood = rng.pick(WOOD);
@@ -359,9 +369,15 @@ export class Buildings {
           for (let k = rng.int(3, 8); k > 0; k--) {
             const cw = rng.range(0.35, 0.75);
             const ch = rng.range(0.45, 0.85);
+            const s0 = g.vertexCount;
             g.box(rng.range(-w / 2 + 0.6, w / 2 - 0.6), y0 + 2.25 - ch / 2, lz, cw, ch, 0.02, rng.pick(CLOTHES), { skip: 0 });
+            g.markSway(s0, y0 + 2.25, ch);
           }
-          for (let k = rng.int(0, 3); k > 0; k--) g.box(rng.range(-w / 2 + 0.6, w / 2 - 0.6), y0 + 0.78, fz + gd + 0.02, 0.6, 0.55, 0.03, rng.pick(CLOTHES));
+          for (let k = rng.int(0, 3); k > 0; k--) {
+            const s0 = g.vertexCount;
+            g.box(rng.range(-w / 2 + 0.6, w / 2 - 0.6), y0 + 0.78, fz + gd + 0.02, 0.6, 0.55, 0.03, rng.pick(CLOTHES));
+            g.markSway(s0, y0 + 1.05, 1.6); // draped over the rail: a gentle stir
+          }
         }
       } else {
         const nw = Math.max(1, Math.floor((w - 0.8) / 2.25));
@@ -418,7 +434,11 @@ export class Buildings {
       if (rng.chance(0.2)) {
         const z = rng.range(-1, d / 4);
         g.rod({ x: -w / 2 + 0.8, y: H + 1.6, z }, { x: w / 2 - 0.8, y: H + 1.6, z }, 0.012, 0x444444);
-        for (let k = rng.int(2, 5); k > 0; k--) g.box(rng.range(-w / 2 + 1, w / 2 - 1), H + 1.3, z, rng.range(0.4, 0.8), 0.6, 0.02, rng.pick(CLOTHES), { skip: 0 });
+        for (let k = rng.int(2, 5); k > 0; k--) {
+          const s0 = g.vertexCount;
+          g.box(rng.range(-w / 2 + 1, w / 2 - 1), H + 1.3, z, rng.range(0.4, 0.8), 0.6, 0.02, rng.pick(CLOTHES), { skip: 0 });
+          g.markSway(s0, H + 1.6, 0.6);
+        }
       }
       if (rng.chance(0.15)) g.cylinder(rng.range(-w / 3, w / 3), H + 1.0, d / 2 - 1, 0.45, 0.05, 0.18, 8, palette.acBody, { rx: -0.9 });
     }

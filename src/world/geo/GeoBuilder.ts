@@ -11,6 +11,8 @@ export class GeoBuilder {
   readonly pos: number[] = [];
   readonly col: number[] = [];
   readonly uv: number[] = [];
+  /** Per-vertex wind weight (0 = fixed, 1 = free); see withWind(). */
+  readonly sway: number[] = [];
   private readonly withUv: boolean;
   private readonly m = new THREE.Matrix4();
   private readonly tmpM = new THREE.Matrix4();
@@ -44,6 +46,7 @@ export class GeoBuilder {
   private push(p: THREE.Vector3, c: THREE.Color, u = 0, v = 0): void {
     this.pos.push(p.x, p.y, p.z);
     this.col.push(c.r, c.g, c.b);
+    this.sway.push(0);
     if (this.withUv) this.uv.push(u, v);
   }
 
@@ -252,11 +255,24 @@ export class GeoBuilder {
     return this;
   }
 
+  /**
+   * Let everything added since `from` move in the wind, hanging from `topY`:
+   * vertices at the top stay put, those `length` below swing fully.
+   */
+  markSway(from: number, topY: number, length: number): this {
+    for (let i = from; i < this.vertexCount; i++) {
+      const y = this.pos[i * 3 + 1]!;
+      this.sway[i] = THREE.MathUtils.clamp((topY - y) / length, 0, 1);
+    }
+    return this;
+  }
+
   build(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     if (this.withUv) g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    if (this.sway.some((v) => v > 0)) g.setAttribute('sway', new THREE.Float32BufferAttribute(this.sway, 1));
     g.computeVertexNormals(); // non-indexed → face normals (needed for shadow normal bias)
     g.computeBoundingSphere();
     return g;
