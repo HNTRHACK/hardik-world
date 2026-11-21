@@ -16,7 +16,7 @@ export class Camera {
   /** Point the camera looks at (damped). */
   readonly target = new THREE.Vector3(0, 0.8, 0);
   /** The default follow offset from the target. */
-  readonly offset = new THREE.Vector3(12, 19.5, 16);
+  readonly offset = new THREE.Vector3(9.4, 13.2, 12.6); // ≈40° down, 21 m: the rickshaw is the hero
   readonly tuning = { lookAhead: 0.45, follow: 4.5, zoomAtSpeed: 0.2, idleReturn: 3, returnRate: 2.2 };
   /** Clamp for player pitch (radians above the horizon). */
   static readonly PITCH = { min: THREE.MathUtils.degToRad(22), max: THREE.MathUtils.degToRad(72) };
