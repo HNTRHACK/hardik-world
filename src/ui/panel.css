@@ -309,6 +309,7 @@
     bottom: 0;
     width: auto;
     max-height: 64vh;
+    max-height: 64dvh;
     padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
     border-radius: 16px 16px 0 0;
     transform: translateY(24px);

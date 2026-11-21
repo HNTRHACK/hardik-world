@@ -30,11 +30,18 @@ export class Quality {
   private cooldown = 1;
   private good = 0;
   private readonly apply: (l: QualityLevel) => void;
+  /** Touch device with a phone-sized screen: starts lower, never climbs past "high", smaller shadows. */
+  readonly phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
+  /** Best level this device may reach. */
+  private readonly best: number;
 
   constructor(apply: (l: QualityLevel) => void, debug: Debug) {
-    this.apply = apply;
-    // Phones and small screens start at "high" (MSAA is wasted at DPR 2+).
-    this.level = matchMedia('(pointer: coarse)').matches || window.devicePixelRatio >= 2 ? 1 : 0;
+    // Phones: shadows at 1024 everywhere (fill-rate and memory are what mid-range GPUs lack).
+    this.apply = this.phone ? (l) => apply({ ...l, shadowMap: Math.min(l.shadowMap, 1024) }) : apply;
+    // Phones start at "medium" (post without bloom, DPR 1.25); tablets and HiDPI at "high"
+    // (MSAA is wasted at DPR 2+); desktops at "ultra". Adaptive steps down from there.
+    this.best = this.phone ? 1 : 0;
+    this.level = this.phone ? 2 : matchMedia('(pointer: coarse)').matches || window.devicePixelRatio >= 2 ? 1 : 0;
     this.apply(LEVELS[this.level]!);
     const f = debug.folder('Quality');
     if (f) {
@@ -85,7 +92,7 @@ export class Quality {
       this.good = 0;
     } else if (avg < 1 / 75) {
       this.good += 1.5; // seconds of headroom
-      if (this.good > 12 && this.level > 0) {
+      if (this.good > 12 && this.level > this.best) {
         this.good = -1e9; // only one step back up per session, no ping-pong
         this.set(this.level - 1);
       }

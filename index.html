@@ -12,10 +12,20 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
-    <a class="skip-classic" href="https://hardik-build-log.vercel.app" data-skip aria-label="Classic site: the same work as a fast, readable page">
-      <span>Classic site</span>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-    </a>
+    <div class="corner">
+      <a class="skip-classic" href="https://hardik-build-log.vercel.app" data-skip aria-label="Classic site: the same work as a fast, readable page">
+        <span>Classic site</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <button class="sound-toggle" type="button" data-sound aria-pressed="false" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 9.5v5h3.5L12 18V6L7.5 9.5H4z"/>
+          <path class="sound-toggle__waves" d="M15.5 9.2a4 4 0 010 5.6M18 6.8a7.5 7.5 0 010 10.4"/>
+          <path class="sound-toggle__off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+        </svg>
+        <span class="visually-hidden">Sound</span>
+      </button>
+    </div>
 
     <div class="loader" data-loader role="progressbar" aria-label="Loading Hardik's Lane" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <p class="loader__title">Hardik’s Lane</p>
@@ -35,6 +45,7 @@
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to drive</span>
         <span><kbd>Space</kbd> handbrake</span>
         <span><kbd>Shift</kbd> boost</span>
+        <span><kbd>H</kbd> horn</span>
         <span><kbd>R</kbd> reset</span>
       </p>
     </main>

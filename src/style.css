@@ -55,6 +55,8 @@
 html,
 body {
   height: 100%;
+  /* iOS Safari: follow the visible viewport as the address bar shows / hides */
+  height: 100dvh;
   overflow: hidden;
   background: var(--ink);
   color: var(--paper);
@@ -217,4 +219,46 @@ body {
   .loader__bar span {
     transition: none;
   }
+}
+
+/* ── Portrait phones: "turn sideways" nudge ── */
+.rotate-hint {
+  position: fixed;
+  top: calc(max(14px, env(safe-area-inset-top)) + 60px);
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 6px 8px 14px;
+  border-radius: 999px;
+  background: rgb(27 19 16 / 0.7);
+  border: 1px solid rgb(246 234 215 / 0.16);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgb(246 234 215 / 0.92);
+  font-size: 13px;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+.rotate-hint.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.rotate-hint button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.rotate-hint button:focus-visible {
+  outline: 2px solid var(--marigold);
 }

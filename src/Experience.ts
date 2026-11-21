@@ -23,6 +23,10 @@ import { Quality } from './render/Quality';
 import { Mood } from './world/Mood';
 import { globals } from './world/geo/patches';
 import { RickshawFX } from './vehicle/RickshawFX';
+import { TouchControls } from './ui/TouchControls';
+import { RotateHint } from './ui/RotateHint';
+import { Sound, type SoundSource } from './audio/Sound';
+import { seaX } from './world/layout';
 
 /** Owns every system. One instance per page; `dispose()` frees all GPU resources. */
 export class Experience {
@@ -46,6 +50,15 @@ export class Experience {
   mood!: Mood;
   private fx!: RickshawFX;
   private minimap!: Minimap;
+  private touch!: TouchControls;
+  private rotateHint!: RotateHint;
+  sound!: Sound;
+  private panelWasOpen = false;
+  private readonly right = new THREE.Vector3();
+  private readonly soundSource: SoundSource = {
+    speed: 0, throttle: 0, boost: false, horn: false, skid: 0, x: 0, z: 0, vx: 0, vz: 0,
+    rightX: 1, rightZ: 0, seaDistance: 100, teleporting: false, chai: null, omen: null,
+  };
   private readonly offTick: () => void;
 
   constructor(
@@ -102,6 +115,16 @@ export class Experience {
     this.menu.onSelect = (id) => void this.travelTo(id);
     this.minimap = new Minimap(this.world.net, this.stalls.stalls);
     this.minimap.onSelect = (id) => void this.travelTo(id);
+    this.stalls.onLabel = (id) => void this.travelTo(id);
+    this.touch = new TouchControls(this.input);
+    this.rotateHint = new RotateHint();
+    this.sound = new Sound();
+    const at = (id: string) => {
+      const p = this.stalls.get(id)?.plot;
+      return p ? { x: p.x, z: p.z } : null;
+    };
+    this.soundSource.chai = at('chaipay');
+    this.soundSource.omen = at('omen');
     this.time.start();
     if (this.debug.active) (window as unknown as { __lane?: Experience }).__lane = this;
   }
@@ -130,6 +153,12 @@ export class Experience {
   async travelTo(id: string): Promise<void> {
     const st = this.stalls.get(id);
     if (!st || this.camera.flying) return;
+    // Already parked at it: just open.
+    const here = this.rickshaw.position;
+    if (Math.hypot(here.x - st.plot.ring.x, here.z - st.plot.ring.z) < 4) {
+      this.stalls.open(id, 'label');
+      return;
+    }
     if (this.panel.current) this.panel.close('away');
     this.stalls.suspended = true;
     const r = st.plot.ring;
@@ -145,7 +174,7 @@ export class Experience {
   private readonly update = ({ delta, elapsed, raw }: TickInfo): void => {
     globals.uTime.value = elapsed;
     this.quality.sample(raw);
-    const active = this.input.down.size > 0 || Math.abs(this.rickshaw.speed) > 0.6 || this.camera.userControlled;
+    const active = this.input.active || Math.abs(this.rickshaw.speed) > 0.6 || this.camera.userControlled;
     this.mood.update(delta, active);
     this.physics.update(delta, (dt) => this.rickshaw.fixedUpdate(dt));
     this.rickshaw.update(delta);
@@ -160,6 +189,12 @@ export class Experience {
     this.stalls.update(elapsed, delta, this.rickshaw, this.camera.instance, this.sizes.width, this.sizes.height);
     this.environment.follow(this.camera.target, this.camera.instance.position);
     updateOcclusion(this.camera.instance, this.rickshaw.position, delta);
+    const panelOpen = !!this.panel.current;
+    if (panelOpen !== this.panelWasOpen) {
+      this.panelWasOpen = panelOpen;
+      this.touch?.setPanelOpen(panelOpen);
+    }
+    if (this.sound) this.updateSound(delta);
     this.minimap?.update(this.rickshaw.position.x, this.rickshaw.position.z, this.rickshaw.physics.yaw, this.panel.current?.id ?? null);
     if (this.post.enabled) this.post.render(this.scene, this.camera.instance);
     else {
@@ -168,8 +203,33 @@ export class Experience {
     }
   };
 
+  private updateSound(delta: number): void {
+    const s = this.soundSource;
+    const p = this.rickshaw.physics;
+    const pos = this.rickshaw.position;
+    const v = p.body.linvel();
+    this.right.setFromMatrixColumn(this.camera.instance.matrixWorld, 0);
+    s.speed = p.forwardSpeed;
+    s.throttle = this.input.throttle;
+    s.boost = this.input.down.has('boost');
+    s.horn = this.input.down.has('horn');
+    s.skid = this.fx.skid;
+    s.x = pos.x;
+    s.z = pos.z;
+    s.vx = v.x;
+    s.vz = v.z;
+    s.rightX = this.right.x;
+    s.rightZ = this.right.z;
+    s.seaDistance = Math.max(0, pos.x - seaX(Math.max(-110, Math.min(110, pos.z))));
+    s.teleporting = this.camera.flying || this.input.down.has('reset');
+    this.sound.update(delta, s);
+  }
+
   dispose(): void {
     this.offTick();
+    this.sound?.dispose();
+    this.touch?.dispose();
+    this.rotateHint?.dispose();
     this.time.dispose();
     this.hint?.dispose();
     this.fx?.dispose();
