@@ -40,6 +40,14 @@ export class Stalls {
   suspended = false;
   private readonly ringGeo = new THREE.CircleGeometry(1, 64);
   private readonly labels: HTMLElement;
+  /** Tapping a floating label: travel there (set by Experience). */
+  onLabel: ((id: string) => void) | null = null;
+  /** Bottom edge of the top bar (safe-area aware), measured on resize, not per frame. */
+  private barBottom = 58;
+  private readonly measureBar = () => {
+    const r = document.querySelector('.corner')?.getBoundingClientRect();
+    if (r && r.height) this.barBottom = r.bottom + 6;
+  };
   private readonly v = new THREE.Vector3();
 
   constructor(
@@ -50,6 +58,9 @@ export class Stalls {
   ) {
     this.ringGeo.rotateX(-Math.PI / 2);
     this.labels = document.querySelector<HTMLElement>('[data-labels]')!;
+    this.measureBar();
+    window.addEventListener('resize', this.measureBar);
+    void document.fonts.ready.then(this.measureBar);
     for (const place of PLACES) {
       const plot = plots.find((p) => p.id === place.plot);
       if (!plot) continue;
@@ -93,7 +104,7 @@ export class Stalls {
     b.className = 'stall-label';
     b.setAttribute('aria-label', `${p.short}, ${p.kind}. Open`);
     b.innerHTML = `<span class="stall-label__icon">${ICONS[p.id] ?? ''}</span><span class="stall-label__text"><span class="stall-label__name">${p.short}</span><span class="stall-label__kind">${p.kind}</span></span>`;
-    b.addEventListener('click', () => this.panel.open(p.entry, 'label'));
+    b.addEventListener('click', () => (this.onLabel ? this.onLabel(p.id) : this.panel.open(p.entry, 'label')));
     this.labels.append(b);
     return b;
   }
@@ -183,13 +194,20 @@ export class Stalls {
     const x = ((this.v.x + 1) / 2) * w;
     const y = ((1 - this.v.y) / 2) * h;
     const scale = THREE.MathUtils.clamp(34 / dist, 0.72, 1.05);
-    const fade = 1 - THREE.MathUtils.smoothstep(dist, LABEL_FAR - 25, LABEL_FAR);
+    // Fade out before the label slides under the top bar (Projects, sound, Classic site).
+    const top = y - 48 * scale;
+    const fade = (1 - THREE.MathUtils.smoothstep(dist, LABEL_FAR - 25, LABEL_FAR)) * THREE.MathUtils.smoothstep(top, this.barBottom, this.barBottom + 38);
+    if (fade < 0.04) {
+      if (!el.classList.contains('is-hidden')) el.classList.add('is-hidden');
+      return;
+    }
     el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%) scale(${scale.toFixed(3)})`;
     el.style.opacity = fade.toFixed(2);
     el.classList.toggle('is-active', this.panel.current?.id === st.place.id);
   }
 
   dispose(): void {
+    window.removeEventListener('resize', this.measureBar);
     for (const st of this.stalls) {
       st.model.root.removeFromParent();
       st.model.dispose();
