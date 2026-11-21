@@ -1,4 +1,5 @@
 import './style.css';
+import './ui/chrome.css';
 import { Loader } from './ui/Loader';
 
 const CLASSIC = 'https://hardik-build-log.vercel.app';
